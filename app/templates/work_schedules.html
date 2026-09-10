@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field_error, csrf, empty_state %}
+{% block title %}작업 일정 · Field Brain{% endblock %}
+{% block eyebrow %}<p class="eyebrow">실제 철거 작업</p>{% endblock %}
+{% block page_heading %}작업 일정{% endblock %}
+{% block page_intro %}<p class="page-intro">실제 철거 날짜·현장·작업 범위·투입 준비를 한곳에서 봅니다.</p>{% endblock %}
+{% block page_actions %}<a class="button button--primary" href="/schedule-import">카카오톡에서 찾기</a>{% endblock %}
+{% block content %}
+{% set values = form_values or {} %}{% set errors = form_errors or {} %}
+<div class="schedule-page">
+  <form class="panel form-card schedule-manual" action="/work-schedules" method="post" novalidate>
+    {{ csrf(csrf_token) }}
+    <div class="panel__header"><div><p class="eyebrow">새 일정</p><h2>철거 작업 잡기</h2></div><span class="schedule-type schedule-type--work">철거 작업</span></div>
+    {% if errors %}<div class="form-error-summary" role="alert"><strong>저장하지 못했습니다.</strong><p>표시된 항목을 확인해 주세요.</p></div>{% endif %}
+    <div class="field-grid">
+      <div class="field field--full{% if errors.get('site_id') %} field--invalid{% endif %}"><label for="work-site">현장 <span class="required">필수</span></label><select id="work-site" name="site_id" required><option value="">현장을 선택하세요</option>{% for site in sites %}<option value="{{ site.id }}"{% if values.get('site_id') == site.id %} selected{% endif %}>{{ site.name }}</option>{% endfor %}</select>{{ field_error(errors, "site_id") }}</div>
+      <div class="field{% if errors.get('start_at') %} field--invalid{% endif %}"><label for="work-start">시작 <span class="required">필수</span></label><input id="work-start" name="start_at" type="datetime-local" required value="{{ values.get('start_at','') }}">{{ field_error(errors, "start_at") }}</div>
+      <div class="field{% if errors.get('end_at') %} field--invalid{% endif %}"><label for="work-end">종료 <span class="optional">선택</span></label><input id="work-end" name="end_at" type="datetime-local" value="{{ values.get('end_at','') }}">{{ field_error(errors, "end_at") }}</div>
+      <div class="field field--full{% if errors.get('summary') %} field--invalid{% endif %}"><label for="work-summary">작업 내용 <span class="required">필수</span></label><textarea id="work-summary" name="summary" rows="3" required maxlength="3000" placeholder="예: 1층 가벽 철거와 폐기물 반출">{{ values.get('summary','') }}</textarea>{{ field_error(errors, "summary") }}</div>
+      <div class="field field--full"><label for="work-people">함께 일할 사람 <span class="optional">선택</span></label><input id="work-people" name="participants" type="text" maxlength="1000" value="{{ values.get('participants','') }}" placeholder="예: 나, 아마라, 니마"></div>
+      <div class="field field--full"><label for="work-notes">메모 <span class="optional">선택</span></label><textarea id="work-notes" name="notes" rows="2" maxlength="3000">{{ values.get('notes','') }}</textarea></div>
+    </div>
+    <div class="form-actions"><p>견적 방문과 시간이 겹쳐도 그대로 저장할 수 있습니다.</p><button class="button button--primary" type="submit">작업 일정 저장</button></div>
+  </form>
+  <section class="panel schedule-board schedule-board--work" aria-labelledby="work-list-heading"><div class="panel__header"><div><p class="eyebrow">작업 일정만 모아보기</p><h2 id="work-list-heading">작업 스케줄 표</h2></div>{% if schedule_rows %}<span class="count-pill">예정 {{ upcoming_schedule_count }} · 전체 {{ schedule_rows|length }}</span>{% endif %}</div>
+    {% if schedule_rows %}
+      <div class="work-day-list">{% for day in upcoming_schedule_rows|groupby('date_key') %}<section class="work-day"><header><div><span>{{ day.list[0].day_label }}</span><strong>작업 {{ day.list|length }}건</strong></div>{% if day.list|length > 2 %}<small class="capacity-warning">하루 작업이 3건 이상입니다</small>{% else %}<small>하루 작업판</small>{% endif %}</header><div class="work-day__jobs">{% for item in day.list %}<a class="work-job" href="{{ item.detail_url }}"><div><span class="schedule-card-label">{{ item.time_label }}{% if item.end_label %} ~ {{ item.end_label }}{% endif %}</span><h3>{{ item.site_name or item.title }}</h3><p>{{ item.summary }}</p></div><dl><div><dt>투입 인원</dt><dd>{{ item.participants_text or '미정' }}</dd></div><div><dt>장비·준비</dt><dd>{{ item.notes or '아직 입력하지 않음' }}</dd></div></dl><span aria-hidden="true">›</span></a>{% endfor %}</div></section>{% endfor %}</div>
+      {% if past_schedule_rows %}<details class="past-schedules"><summary>지난 작업 {{ past_schedule_rows|length }}건 보기 <span aria-hidden="true">+</span></summary><div class="schedule-list">{% for item in past_schedule_rows %}<a class="schedule-row schedule-row--past" href="{{ item.detail_url }}"><div class="schedule-row__when"><time>{{ item.start_label }}</time></div><div class="schedule-row__body"><strong>{{ item.site_name or item.title }}</strong><p>{{ item.summary }}</p></div></a>{% endfor %}</div></details>{% endif %}
+    {% else %}{{ empty_state("등록된 작업 일정이 없습니다", "카카오톡의 공사 픽스는 작업 일정으로 자동 등록됩니다.") }}{% endif %}
+  </section>
+</div>
+{% endblock %}

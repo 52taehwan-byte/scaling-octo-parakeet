@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf %}
+{% block title %}오늘 · Field Brain{% endblock %}
+{% block eyebrow %}{% endblock %}
+{% block page_heading %}오늘{% endblock %}
+{% block page_intro %}<p class="page-intro">{{ today_label }}</p>{% endblock %}
+{% block content %}
+<form hidden aria-hidden="true">{{ csrf(csrf_token) }}</form>
+<section class="today-block"><div class="simple-heading"><h2>오늘 작업</h2><a href="/schedules?view=work">전체 일정</a></div>
+{% set work_rows = today_schedule_items|selectattr('type_class','equalto','work')|list %}
+{% if work_rows %}<div class="simple-card-list">{% for item in work_rows %}<a class="simple-schedule-card simple-schedule-card--work" href="{{ item.detail_url }}"><time>{{ item.time_label }}{% if item.end_time_label %}–{{ item.end_time_label }}{% endif %}</time><strong>{{ item.site_name or item.title }}</strong><span>{{ item.summary }}</span>{% if item.participants_text %}<small>{{ item.participants_text }}</small>{% endif %}<b aria-hidden="true">›</b></a>{% endfor %}</div>{% else %}<div class="simple-empty">오늘 등록된 작업이 없습니다.</div>{% endif %}
+</section>
+<section class="today-block"><div class="simple-heading"><h2>오늘 견적 방문</h2><a href="/schedules?view=visit">전체 일정</a></div>
+{% set visit_rows = today_schedule_items|selectattr('type_class','equalto','visit')|list %}
+{% if visit_rows %}<div class="simple-card-list">{% for item in visit_rows %}<a class="simple-schedule-card simple-schedule-card--visit" href="{{ item.detail_url }}"><time>{{ item.time_label }}</time><strong>{{ item.customer_name or item.title }}</strong><span>{{ item.summary }}</span>{% if item.address_text %}<small>{{ item.address_text }}</small>{% endif %}<b aria-hidden="true">›</b></a>{% endfor %}</div>{% else %}<div class="simple-empty">오늘 등록된 견적 방문이 없습니다.</div>{% endif %}
+</section>
+<section class="today-capture"><div class="simple-heading"><h2>기록 남기기</h2><a href="/records">기록 화면</a></div><div class="capture-choice"><a href="/daily-log"><span aria-hidden="true">✎</span><strong>오늘의 작업일지</strong><small>형식 없이 오늘 일을 한 번에 남기기</small></a><a href="/schedule-import"><span aria-hidden="true">＋</span><strong>업무 자료 넣기</strong><small>카톡·문서에서 일정과 현장 내용을 정리</small></a></div></section>
+{% endblock %}

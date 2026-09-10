@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}기록 · Field Brain{% endblock %}
+{% block eyebrow %}{% endblock %}
+{% block page_heading %}기록{% endblock %}
+{% block page_intro %}<p class="page-intro">태환 씨는 있었던 일을 전달하고, Field Brain이 현장과 일정에 연결합니다.</p>{% endblock %}
+{% block content %}
+<section class="capture-choice record-hub" aria-label="기록 방법 선택">
+  <a href="/schedule-import"><span aria-hidden="true">＋</span><strong>업무 자료 넣기</strong><small>카카오톡·문서·통화 전사에서 일정과 현장 내용을 찾습니다.</small></a>
+  <a href="/daily-log"><span aria-hidden="true">✎</span><strong>오늘의 작업일지</strong><small>항목을 나누지 않고 오늘 일을 줄글로 자유롭게 씁니다.</small></a>
+</section>
+<section class="panel hub-explanation">
+  <p class="eyebrow">한 번만 전달하세요</p>
+  <h2>같은 내용을 여러 곳에 다시 적지 않습니다</h2>
+  <p>Field Brain이 원문을 보존하고 현장, 일정, 작업, 사람, 장비, 폐기물, 비용과 남은 일로 먼저 정리합니다. 결과가 맞으면 아무것도 누르지 않아도 됩니다.</p>
+  <div class="hub-flow" aria-label="기록 처리 흐름"><span>자료·일지</span><b>→</b><span>AI 정리</span><b>→</b><span>일정·현장 갱신</span><b>→</b><span>틀린 것만 수정</span></div>
+</section>
+{% endblock %}

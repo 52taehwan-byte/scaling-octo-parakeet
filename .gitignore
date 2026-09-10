@@ -1,0 +1,44 @@
+# 실제 업무 데이터는 이 프로젝트와 Git에 넣지 않는다.
+# 과거 원본·코드 스냅샷과 개인 현장 사례는 공개 후보에서 제외한다.
+reference/
+# 공개 문서는 별도로 확인한 현재 기준만 포함한다.
+docs/*
+!docs/public/
+docs/public/*
+!docs/public/PRODUCT.md
+!docs/public/PLAYBOOK.md
+app/templates/UI_CONTRACT.md
+app/import_historical_reference.py
+outputs/
+attachments/
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.jpg
+*.jpeg
+*.png
+*.pdf
+runtime/
+private-data/
+uploads/
+backups/
+sources/raw/
+
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.jsonl
+*.log
+*.zip
+
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/

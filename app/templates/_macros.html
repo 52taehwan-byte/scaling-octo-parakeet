@@ -1,0 +1,70 @@
+{% macro money(value) -%}
+  {% if value is not none and value != "" %}
+    {{ "{:,.0f}".format(value) }}원
+  {% else %}
+    <span class="value-unknown">미확인</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro field_error(errors, name) -%}
+  {% if errors and errors.get(name) %}
+    <p class="field-error" id="error-{{ name }}" role="alert">{{ errors.get(name) }}</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro review_badge(status) -%}
+  {% if status == "approved" %}
+    <span class="badge badge--confirmed">확정</span>
+  {% elif status == "corrected" %}
+    <span class="badge badge--corrected">수정됨</span>
+  {% elif status == "held" %}
+    <span class="badge badge--held">보류</span>
+  {% elif status == "rejected" %}
+    <span class="badge badge--muted">제외됨</span>
+  {% else %}
+    <span class="badge badge--review">검토 필요</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro epistemic_badge(status) -%}
+  {% if status == "fact" %}
+    <span class="badge badge--fact">확인한 사실</span>
+  {% elif status == "decision" %}
+    <span class="badge badge--decision">결정사항</span>
+  {% elif status == "inference" %}
+    <span class="badge badge--estimate">추정</span>
+  {% elif status == "recommendation" %}
+    <span class="badge badge--advice">AI 제안</span>
+  {% else %}
+    <span class="badge badge--claim">전해 들은 내용</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro severity_badge(severity) -%}
+  {% if severity == "critical" %}
+    <span class="badge badge--danger">매우 높음</span>
+  {% elif severity == "high" %}
+    <span class="badge badge--danger">높음</span>
+  {% elif severity == "medium" %}
+    <span class="badge badge--warning">보통</span>
+  {% else %}
+    <span class="badge badge--muted">낮음</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro empty_state(title, description, action_url="", action_label="") -%}
+  <div class="empty-state">
+    <span class="empty-state__mark" aria-hidden="true">+</span>
+    <h3>{{ title }}</h3>
+    <p>{{ description }}</p>
+    {% if action_url and action_label %}
+      <a class="button button--secondary" href="{{ action_url }}">{{ action_label }}</a>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro csrf(csrf_token) -%}
+  {% if csrf_token %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% endif %}
+{%- endmacro %}

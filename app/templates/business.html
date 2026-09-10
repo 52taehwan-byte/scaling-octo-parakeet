@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import money %}
+{% block title %}사업 · Field Brain{% endblock %}
+{% block eyebrow %}{% endblock %}
+{% block page_heading %}사업{% endblock %}
+{% block page_intro %}<p class="page-intro">숫자를 적는 곳이 아니라, 다음 견적과 운영 판단에 과거 경험을 쓰는 곳입니다.</p>{% endblock %}
+{% block content %}
+<section class="metric-grid business-summary" aria-label="현재 사업 요약">
+  <article class="metric-card"><span>기록된 현장</span><strong>{{ site_count }}곳</strong><small>경험이 쌓인 현장</small></article>
+  <article class="metric-card metric-card--primary"><span>견적금액</span><strong>{{ money(quote_revenue) }}</strong><small>현재 기록 기준</small></article>
+  <article class="metric-card"><span>실행비 전망</span><strong>{{ money(estimated_cost) }}</strong><small>인건비·장비·폐기물 등</small></article>
+  <article class="metric-card metric-card--soft"><span>예상 마진</span><strong>{{ money(estimated_margin) }}</strong><small>견적금액 − 실행비</small></article>
+</section>
+<section class="capture-choice business-tools" aria-label="사업 도구">
+  <a href="/ledger"><span aria-hidden="true">₩</span><strong>견적과 비용 보기</strong><small>현장별 견적금액, 실행비와 비용 항목을 봅니다.</small></a>
+  <a href="/field-reference"><span aria-hidden="true">≡</span><strong>현장 참고 열기</strong><small>용어, 품목별 단가, 장비·폐기물 비용과 실제 사례 {{ standard_count }}개를 활용합니다.</small></a>
+</section>
+<section class="panel hub-explanation">
+  <p class="eyebrow">Field Brain의 다음 단계</p>
+  <h2>기록을 사업 판단으로 바꿉니다</h2>
+  <p>비슷한 현장의 실행비와 작업 기간을 비교하고, 자주 빠지는 비용과 반복되는 손실 원인을 알려주는 공간으로 발전시킵니다.</p>
+  {% if recent_standards %}<div class="business-standard-preview">{% for item in recent_standards %}<article><strong>{{ item.title }}</strong><p>{{ item.rule_text }}</p></article>{% endfor %}</div>{% endif %}
+</section>
+{% endblock %}

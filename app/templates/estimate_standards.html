@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, empty_state %}
+{% block title %}현장 참고 · Field Brain{% endblock %}
+{% block eyebrow %}<p class="eyebrow">현장에서 바로 꺼내 보는 실제 참고값</p>{% endblock %}
+{% block page_heading %}현장 참고{% endblock %}
+{% block page_intro %}<p class="page-intro">현장 용어, 품목별 단가, 장비·폐기물 비용과 실제 사례를 한곳에서 찾습니다.</p>{% endblock %}
+{% block page_actions %}<a class="button button--secondary" href="/field-reference?archived={% if show_archived %}0{% else %}1{% endif %}">{% if show_archived %}사용 중인 메모만{% else %}보관한 메모도 보기{% endif %}</a>{% endblock %}
+{% block content %}
+<form class="reference-search" action="/field-reference" method="get" role="search">
+  <label class="sr-only" for="reference-q">현장 참고 검색</label>
+  <input id="reference-q" name="q" type="search" value="{{ q or '' }}" placeholder="예: 마루, 왈가닥, 2.5톤, 샷시">
+  <button class="button button--primary" type="submit">찾기</button>
+</form>
+<section class="standards-intro panel">
+  <div><p class="eyebrow">필요할 때 바로 검색</p><h2>용어부터 평당 단가와 폐기물 비용까지</h2></div>
+  <p>예: “데코타일 철거 평당 1.8만 원”, “마루 철거·샌딩 외주 평당 2.8만 원”처럼 짧게 남겨도 됩니다. 실제 지출, 고객 청구 기준, 과거 사례가 다르면 내용에 구분해서 적습니다.</p>
+</section>
+
+{% if groups %}
+<div class="standard-groups">
+  {% for group in groups %}
+  <section class="panel standard-group">
+    <div class="panel__header"><div><p class="eyebrow">{{ "%02d"|format(loop.index) }}</p><h2>{{ group.label }}</h2></div><span class="badge badge--muted">{{ group['items']|length }}개</span></div>
+    <div class="standard-list">
+      {% for item in group['items'] %}
+      <article class="standard-card{% if not item.is_active %} standard-card--archived{% endif %}">
+        <div class="standard-card__top"><h3>{{ item.title }}</h3>{% if not item.is_active %}<span class="badge badge--muted">보관됨</span>{% endif %}</div>
+        <p class="standard-card__rule">{{ item.rule_text }}</p>
+        {% if item.rationale %}<p class="standard-card__why"><strong>왜:</strong> {{ item.rationale }}</p>{% endif %}
+        {% if item.source_note %}<small>근거·메모 · {{ item.source_note }}</small>{% endif %}
+        <form action="/estimate-standards/{{ item.id }}/active" method="post">
+          {{ csrf(csrf_token) }}<input type="hidden" name="is_active" value="{% if item.is_active %}0{% else %}1{% endif %}">
+          <button class="text-button" type="submit">{% if item.is_active %}더 이상 쓰지 않기{% else %}다시 사용하기{% endif %}</button>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% else %}
+  {{ empty_state("찾는 현장 메모가 없습니다", "다른 단어로 찾거나 아래에서 새 참고 내용을 추가하세요.", "/field-reference", "전체 메모 보기") }}
+{% endif %}
+
+<details class="form-disclosure standard-add">
+  <summary><span><strong>새 참고 내용 추가</strong><small>용어, 단가, 비용이나 실제 사례를 한 줄로 남깁니다.</small></span><span aria-hidden="true">+</span></summary>
+  <form class="disclosure-form" action="/estimate-standards" method="post" novalidate>
+    {{ csrf(csrf_token) }}
+    <div class="field-grid">
+      <div class="field"><label for="standard-category">분류</label><select id="standard-category" name="category"><option value="other">현장 용어·기타</option><option value="labor">인건비</option><option value="equipment">장비</option><option value="waste">폐기물</option><option value="margin">견적·마진</option><option value="restoration">철거·원상복구 단가</option><option value="condition">조건별 가산 사례</option></select></div>
+      <div class="field"><label for="standard-title">찾기 쉬운 이름</label><input id="standard-title" name="title" required value="{{ form_values.get('title','') }}" placeholder="예: 마루 철거 단가"></div>
+      <div class="field field--full"><label for="standard-rule">참고 내용</label><textarea id="standard-rule" name="rule_text" rows="4" required placeholder="예: 마루 철거는 평당 1.8만 원. 현장 조건에 따라 다시 확인.">{{ form_values.get('rule_text','') }}</textarea></div>
+      <div class="field"><label for="standard-why">이유 <span class="optional">선택</span></label><textarea id="standard-why" name="rationale" rows="3">{{ form_values.get('rationale','') }}</textarea></div>
+      <div class="field"><label for="standard-source">근거·메모 <span class="optional">선택</span></label><textarea id="standard-source" name="source_note" rows="3" placeholder="어느 현장이나 대화에서 정했는지">{{ form_values.get('source_note','') }}</textarea></div>
+    </div>
+    <div class="form-actions"><p>과거 사례인지 현재 적용하는 기준인지 내용에 함께 적어두면 혼동을 줄일 수 있습니다.</p><button class="button button--primary" type="submit">참고 내용 저장</button></div>
+  </form>
+</details>
+{% endblock %}

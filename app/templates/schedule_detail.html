@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field_error, money %}
+{% block title %}{{ schedule.site_name or schedule.customer_name or schedule.title }} · Field Brain{% endblock %}
+{% block eyebrow %}<p class="eyebrow">{{ schedule.type_label }} 상세</p>{% endblock %}
+{% block page_heading %}{{ schedule.site_name or schedule.customer_name or schedule.title }}{% endblock %}
+{% block page_intro %}<p class="page-intro">오늘 화면에서는 접어 둔 일정 내용을 확인합니다.</p>{% endblock %}
+{% block page_actions %}<a class="button button--secondary" href="/">오늘로 돌아가기</a>{% endblock %}
+{% block content %}
+<section class="panel schedule-detail">
+  <div class="panel__header"><div><p class="eyebrow">일정 종류</p><h2><span class="schedule-type schedule-type--{{ schedule.type_class }}">{{ schedule.type_label }}</span></h2></div><span class="badge{% if schedule.business_status == 'cancelled' %} badge--muted{% else %} badge--confirmed{% endif %}">{{ schedule.status_label }}</span></div>
+  <dl class="schedule-detail__facts">
+    <div><dt>날짜와 시간</dt><dd>{{ schedule.start_label }}{% if schedule.end_label %} ~ {{ schedule.end_label }}{% endif %}</dd></div>
+    {% if schedule.site_name %}<div><dt>현장</dt><dd>{{ schedule.site_name }}</dd></div>{% endif %}
+    {% if schedule.customer_name %}<div><dt>고객 또는 구분명</dt><dd>{{ schedule.customer_name }}</dd></div>{% endif %}
+    {% if schedule.address_text %}<div><dt>주소</dt><dd>{{ schedule.address_text }}</dd></div>{% endif %}
+    <div><dt>{% if schedule.type_class == 'work' %}작업 내용{% else %}요청받은 철거 내용{% endif %}</dt><dd>{{ schedule.summary }}</dd></div>
+    {% if schedule.participants_text %}<div><dt>함께 일할 사람</dt><dd>{{ schedule.participants_text }}</dd></div>{% endif %}
+    {% if schedule.customer_contact %}<div><dt>연락처</dt><dd>{{ schedule.customer_contact }}</dd></div>{% endif %}
+    {% if schedule.notes %}<div><dt>메모</dt><dd>{{ schedule.notes }}</dd></div>{% endif %}
+  </dl>
+  <div class="schedule-detail__actions">
+    {% if schedule.site_id %}<a class="button button--primary" href="/sites/{{ schedule.site_id }}">현장 자세히 보기</a>{% endif %}
+    <a class="button button--secondary" href="{% if schedule.type_class == 'work' %}/work-schedules{% else %}/estimate-visits{% endif %}">전체 {{ schedule.type_label }} 보기</a>
+  </div>
+</section>
+{% if schedule.review_status == 'approved' and schedule.business_status != 'completed' %}
+<section class="schedule-change-tools" aria-label="일정 변경과 취소">
+  <details class="form-disclosure">
+    <summary><span><strong>날짜·시간 바꾸기</strong><small>이전 일정과 변경 이유는 이력에 남습니다.</small></span><span aria-hidden="true">+</span></summary>
+    <form class="disclosure-form" action="/schedules/{{ schedule.id }}/reschedule" method="post">
+      {{ csrf(csrf_token) }}
+      <div class="field-grid">
+        <div class="field"><label for="reschedule-start">새 시작 날짜와 시간 <span class="required">필수</span></label><input id="reschedule-start" name="start_at" type="datetime-local" required></div>
+        <div class="field"><label for="reschedule-end">새 종료 날짜와 시간 <span class="optional">선택</span></label><input id="reschedule-end" name="end_at" type="datetime-local"></div>
+        <div class="field field--full"><label for="reschedule-reason">왜 바뀌었나요? <span class="required">필수</span></label><textarea id="reschedule-reason" name="reason" rows="3" required maxlength="2000" placeholder="예: 고객 요청으로 8월 28일 12시로 변경"></textarea></div>
+      </div>
+      <div class="form-actions"><button class="button button--primary" type="submit">새 일정으로 변경</button></div>
+    </form>
+  </details>
+  <details class="form-disclosure">
+    <summary><span><strong>{% if schedule.business_status == 'cancelled' %}일정 다시 살리기{% else %}일정 취소하기{% endif %}</strong><small>기록은 지우지 않고 상태와 이유만 남깁니다.</small></span><span aria-hidden="true">+</span></summary>
+    <form class="disclosure-form" action="/schedules/{{ schedule.id }}/cancel" method="post">
+      {{ csrf(csrf_token) }}
+      <input type="hidden" name="cancelled" value="{% if schedule.business_status == 'cancelled' %}0{% else %}1{% endif %}">
+      <div class="field"><label for="cancel-reason">{% if schedule.business_status == 'cancelled' %}다시 예정으로 돌리는 이유{% else %}취소 이유{% endif %} <span class="required">필수</span></label><textarea id="cancel-reason" name="reason" rows="3" required maxlength="2000" placeholder="예: 고객이 방문 일정을 취소해 달라고 요청"></textarea></div>
+      <div class="form-actions"><button class="button button--secondary" type="submit">{% if schedule.business_status == 'cancelled' %}다시 예정으로{% else %}취소 상태로 변경{% endif %}</button></div>
+    </form>
+  </details>
+</section>
+{% endif %}
+{% if schedule.type_class == 'visit' %}
+  {% set saved = estimate_result or {} %}
+  {% set v = estimate_form_values if estimate_form_values else saved %}
+  {% set e = estimate_form_errors or {} %}
+  <section id="estimate-result" class="panel estimate-result">
+    <div class="panel__header"><div><p class="eyebrow">방문하고 난 뒤</p><h2>견적 방문 결과</h2><p>고객 요청과 내가 계산한 실행 계획을 분리해서 남깁니다.</p></div>{% if saved %}<span class="badge badge--confirmed">저장됨</span>{% endif %}</div>
+    {% if saved %}
+      <div class="estimate-result__summary">
+        <article><span>고객 요청 사항</span><p>{{ saved.customer_requests }}</p></article>
+        {% if saved.work_plan %}<article><span>작업 계획·인원</span><p>{{ saved.work_plan }}</p></article>{% endif %}
+        <div class="estimate-cost-grid">
+          <div><span>인건비</span><strong>{{ money(saved.labor_cost_krw) }}</strong></div>
+          <div><span>장비비</span><strong>{{ money(saved.equipment_cost_krw) }}</strong></div>
+          <div><span>폐기물비</span><strong>{{ money(saved.waste_cost_krw) }}</strong></div>
+          <div><span>원상복구비</span><strong>{{ money(saved.restoration_cost_krw) }}</strong></div>
+          <div class="estimate-cost-grid__total"><span>고객 견적 합계</span><strong>{{ money(saved.total_quote_krw) }}</strong></div>
+        </div>
+        {% if saved.conditions_text %}<article><span>조건·변동·서비스</span><p>{{ saved.conditions_text }}</p></article>{% endif %}
+      </div>
+    {% endif %}
+    <details class="form-disclosure"{% if e %} open{% endif %}>
+      <summary><span>{% if saved %}견적 결과 수정하기{% else %}견적 결과 작성하기{% endif %}</span><span aria-hidden="true">+</span></summary>
+      <form class="disclosure-form" action="/schedules/{{ schedule.id }}/estimate-result" method="post" novalidate>
+        {{ csrf(csrf_token) }}
+        {% if e %}<div class="form-error-summary" role="alert"><strong>확인할 내용이 있습니다.</strong><p>표시된 내용과 금액을 확인해 주세요.</p></div>{% endif %}
+        <div class="field field--full"><label for="result-requests">고객 요청 사항 <span class="required">필수</span></label><textarea id="result-requests" name="customer_requests" rows="9" required maxlength="20000" placeholder="총평수, 철거 범위, 복구 요청, 설비 매입 문의 등을 번호로 적으세요.">{{ v.get('customer_requests','') }}</textarea>{{ field_error(e, 'customer_requests') }}</div>
+        <div class="field field--full"><label for="result-plan">내가 짠 작업 계획·인원</label><textarea id="result-plan" name="work_plan" rows="10" maxlength="20000" placeholder="1일차(기공2·조공2): 주방 가벽과 바닥 철거&#10;2일차(기공2·조공2): 주방 바닥 철거 이어서…">{{ v.get('work_plan','') }}</textarea></div>
+        <div class="field-grid estimate-input-grid">
+          <div class="field"><label for="result-labor">인건비 합계</label><input id="result-labor" name="labor_cost_krw" inputmode="numeric" value="{{ v.get('labor_cost_krw') or '' }}" placeholder="예: 3650000">{{ field_error(e, 'labor_cost_krw') }}</div>
+          <div class="field"><label for="result-equipment-cost">장비비 합계</label><input id="result-equipment-cost" name="equipment_cost_krw" inputmode="numeric" value="{{ v.get('equipment_cost_krw') or '' }}" placeholder="예: 2450000">{{ field_error(e, 'equipment_cost_krw') }}</div>
+          <div class="field field--full"><label for="result-equipment">차량·장비 내역</label><textarea id="result-equipment" name="equipment_plan" rows="4" maxlength="10000" placeholder="사다리차 1일 75만원&#10;미니 포크레인 2일 140만원&#10;고소 작업 장비 30만원">{{ v.get('equipment_plan','') }}</textarea></div>
+          <div class="field"><label for="result-waste-cost">폐기물비 합계</label><input id="result-waste-cost" name="waste_cost_krw" inputmode="numeric" value="{{ v.get('waste_cost_krw') or '' }}" placeholder="예: 4100000">{{ field_error(e, 'waste_cost_krw') }}</div>
+          <div class="field"><label for="result-restoration-cost">원상복구비 합계</label><input id="result-restoration-cost" name="restoration_cost_krw" inputmode="numeric" value="{{ v.get('restoration_cost_krw') or '' }}" placeholder="예: 3100000">{{ field_error(e, 'restoration_cost_krw') }}</div>
+          <div class="field"><label for="result-waste">폐기물 내역</label><textarea id="result-waste" name="waste_plan" rows="5" maxlength="10000" placeholder="목재 1톤 1차 20만원&#10;왈가닥 2.5톤 1차 40만원&#10;통합폐기물 2.5톤 3차 210만원">{{ v.get('waste_plan','') }}</textarea></div>
+          <div class="field"><label for="result-restoration">원상복구 내역</label><textarea id="result-restoration" name="restoration_plan" rows="5" maxlength="10000" placeholder="폴딩도어 → 통유리 150만원&#10;환풍기 6개 → 샷시 복원 160만원">{{ v.get('restoration_plan','') }}</textarea></div>
+          <div class="field field--full"><label for="result-total">고객 견적 합계</label><input id="result-total" name="total_quote_krw" inputmode="numeric" value="{{ v.get('total_quote_krw') or '' }}" placeholder="예: 13300000">{{ field_error(e, 'total_quote_krw') }}<p class="field-help">모르면 비워 두세요. 0원으로 처리하지 않습니다.</p></div>
+          <div class="field field--full"><label for="result-conditions">조건·변동 가능성·서비스</label><textarea id="result-conditions" name="conditions_text" rows="6" maxlength="10000" placeholder="필름 미제거 시 50만원 감소&#10;금색칠까지 벗겨질 경우 재시공 추가비용&#10;외부 창고 철거·폐기 서비스">{{ v.get('conditions_text','') }}</textarea></div>
+        </div>
+        <div class="form-actions"><p>방문 일정에는 넣지 않고, 방문 결과에만 저장합니다.</p><button class="button button--primary" type="submit">견적 결과 저장</button></div>
+      </form>
+    </details>
+  </section>
+{% endif %}
+{% endblock %}

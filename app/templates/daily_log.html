@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field_error %}
+
+{% block title %}오늘의 철거 기록 · Field Brain{% endblock %}
+{% block page_heading %}오늘의 철거 기록{% endblock %}
+{% block page_intro %}<p class="page-intro">형식에 맞추지 말고, 오늘 있었던 일을 이야기하듯 한 번에 적으세요.</p>{% endblock %}
+
+{% block content %}
+  {% set v = form_values if form_values is defined else {} %}
+  {% set e = form_errors if form_errors is defined else {} %}
+  <form class="panel daily-log-form" action="/daily-log" method="post" novalidate>
+    {{ csrf(csrf_token if csrf_token is defined else "") }}
+    {% if e %}<div class="form-error-summary" role="alert"><strong>확인할 내용이 있습니다.</strong><p>현장과 날짜, 오늘의 기록을 확인해 주세요.</p></div>{% endif %}
+    <section class="form-section">
+      <div class="form-section__heading"><span>1</span><div><p class="eyebrow">먼저 이것만</p><h2>어디에서 언제 일했나요?</h2></div></div>
+      <div class="field-grid">
+        <div class="field{% if e.get('site_name') %} field--invalid{% endif %}"><label for="daily-site">현장 <span class="required">필수</span></label><input id="daily-site" name="site_name" list="daily-site-list" value="{{ v.get('site_name', '') }}" required maxlength="200" placeholder="예: 평택 리모델링 철거"><datalist id="daily-site-list">{% for site in sites %}<option value="{{ site.get('name') }}"></option>{% endfor %}</datalist>{{ field_error(e, "site_name") }}<p class="field-help">기존 현장을 선택하거나 새 현장 이름을 적으세요.</p></div>
+        <div class="field{% if e.get('log_date') %} field--invalid{% endif %}"><label for="daily-date">작업 날짜 <span class="required">필수</span></label><input id="daily-date" type="date" name="log_date" value="{{ v.get('log_date', '') }}" required>{{ field_error(e, "log_date") }}</div>
+      </div>
+    </section>
+
+    <section class="form-section">
+      <div class="form-section__heading"><span>2</span><div><p class="eyebrow">한 번에 편하게</p><h2>오늘 이야기를 그대로 적어 주세요</h2></div></div>
+      <div class="field daily-story{% if e.get('entry_text') %} field--invalid{% endif %}">
+        <label for="daily-entry">오늘의 기록 <span class="required">필수</span></label>
+        <textarea id="daily-entry" name="entry_text" rows="14" maxlength="20000" required placeholder="예: 오늘은 시흥 월곶 현장에서 아마라와 비닐하우스 자재를 2.5톤 차 두 대 분량 반출했다. 니마와 포크레인 팀은 농막과 콘크리트 바닥을 철거했다. 남은 폐기물은 토요일에 처리하고 잔금도 그날 받기로 했다. 예상보다 짐이 많았고 고객이 버린다는 말을 여러 번 바꿔 작업이 늦어졌다. 비닐하우스 물품 반출 비용이 기존 견적에 포함됐는지는 다시 확인해야 한다.">{{ v.get('entry_text', '') }}</textarea>
+        {{ field_error(e, "entry_text") }}
+        <p class="field-help">사람, 장비, 돈, 사장님이 한 말, 예상과 달랐던 일, 남은 일을 섞어서 써도 됩니다.</p>
+        <aside class="daily-writing-guide" aria-labelledby="daily-guide-title">
+          <div>
+            <strong id="daily-guide-title">생각이 안 날 때만 참고하세요</strong>
+            <small>아래 내용을 구분해서 쓰거나 모두 적을 필요는 없습니다.</small>
+          </div>
+          <ul>
+            <li><b>작업</b><span>무엇을 철거하거나 옮겼는지</span></li>
+            <li><b>사람</b><span>누구와 일했고 누가 무엇을 했는지</span></li>
+            <li><b>차량·장비</b><span>무엇을 몇 번 또는 얼마나 썼는지</span></li>
+            <li><b>폐기물·고물</b><span>버렸는지, 팔았는지, 남겨뒀는지</span></li>
+            <li><b>돈</b><span>낸 돈, 받은 돈, 부른 금액, 모르는 금액</span></li>
+            <li><b>지시·배운 점</b><span>사장님이 한 말이나 기억할 작업 요령</span></li>
+            <li><b>달라진 일</b><span>물량·시간·범위가 예상과 달랐는지</span></li>
+            <li><b>다음 일</b><span>남은 작업과 다음 일정</span></li>
+            <li><b>확인할 점</b><span>궁금하거나 나중에 물어볼 내용</span></li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+    <div class="capture-assurance"><span aria-hidden="true">✓</span><p><strong>작성한 기록은 원문 그대로 이 컴퓨터에 보존합니다.</strong>빈 항목은 추측해서 채우지 않으며, 나중에 AI 분석과 사업 회고의 근거로 사용합니다.</p></div>
+    <div class="form-actions"><p>저장하면 Field Brain이 현장 기록과 비용, 남은 일, 배운 점을 먼저 정리합니다. 틀린 내용만 나중에 고치면 됩니다.</p><button class="button button--primary" type="submit">한 번에 기록 저장</button></div>
+    <section class="form-section"><h2>오늘 투입한 돈</h2><p>예: 인건비 50만원 지급. 주유비 7만원 지불, 점심 3만원 결제.</p><p>항목별 금액과 실제 지급·지출 사실이 분명하면 저장과 함께 장부에 반영됩니다. 예상 비용, 고객 청구액, 계산식이나 뜻이 불분명한 금액은 자동 합산하지 않습니다.</p><p>사람만 적으면 투입 인원을 보여줍니다. 일당과 근무량이 없으면 인건비를 임의로 계산하지 않습니다.</p><a href="/ledger?filter=cost">지출 장부 보기</a></section>
+    <p><a href="/worker-rates">작업자 일당 등록·변경</a></p>
+  </form>
+{% endblock %}

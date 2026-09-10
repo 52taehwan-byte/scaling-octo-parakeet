@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field_error, csrf %}
+{% block title %}견적 방문 · Field Brain{% endblock %}
+{% block eyebrow %}<p class="eyebrow">견적을 내기 위한 고객 방문</p>{% endblock %}
+{% block page_heading %}견적 방문{% endblock %}
+{% block page_intro %}<p class="page-intro">달력에서 방문이 몰린 날을 보고, 날짜를 눌러 그날 동선을 확인합니다.</p>{% endblock %}
+{% block page_actions %}<a class="button button--primary" href="/schedule-import">카카오톡에서 찾기</a>{% endblock %}
+{% block content %}
+{% set values = form_values or {} %}{% set errors = form_errors or {} %}
+<div class="visit-planner">
+  <section class="panel visit-calendar-panel" aria-labelledby="visit-calendar-heading">
+    <header class="calendar-toolbar">
+      <a href="/estimate-visits?month={{ calendar_previous }}" aria-label="이전 달">‹</a>
+      <div><p class="eyebrow">월간 방문 일정</p><h2 id="visit-calendar-heading">{{ calendar_title }}</h2></div>
+      <a href="/estimate-visits?month={{ calendar_next }}" aria-label="다음 달">›</a>
+    </header>
+    <div class="visit-calendar" role="grid" aria-label="{{ calendar_title }} 견적 방문 달력">
+      <div class="calendar-weekdays" role="row">
+        {% for label in ['일','월','화','수','목','금','토'] %}<span role="columnheader">{{ label }}</span>{% endfor %}
+      </div>
+      <div class="calendar-weeks">
+        {% for week in calendar_weeks %}
+          <div class="calendar-week" role="row">
+            {% for cell in week %}
+              <a role="gridcell" class="calendar-day{% if not cell.in_month %} is-outside{% endif %}{% if cell.is_today %} is-today{% endif %}{% if cell.is_selected %} is-selected{% endif %}{% if cell.count %} has-visits{% endif %}" href="/estimate-visits?month={{ calendar_month }}&day={{ cell.date_key }}" aria-label="{{ cell.date_key }}{% if cell.count %}, 방문 {{ cell.count }}건{% endif %}"{% if cell.is_selected %} aria-selected="true"{% endif %}>
+                <span>{{ cell.day }}</span>
+                {% if cell.count %}<small>{{ cell.count }}</small><i aria-hidden="true">{% for _ in range([cell.count, 3]|min) %}•{% endfor %}</i>{% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <footer class="calendar-legend"><span><i class="legend-dot"></i> 방문 있음</span><span><i class="legend-today"></i> 오늘</span></footer>
+  </section>
+
+  <section class="panel selected-visits" aria-labelledby="selected-visits-heading">
+    <div class="panel__header"><div><p class="eyebrow">선택한 날짜</p><h2 id="selected-visits-heading">{{ selected_day_label }}</h2></div><span class="count-pill">{{ selected_visit_rows|length }}건</span></div>
+    {% if selected_visit_rows %}
+      <div class="visit-route">
+        {% for item in selected_visit_rows %}
+          <a class="visit-stop" href="{{ item.detail_url }}"><time>{{ item.time_label }}</time><div><strong>{{ item.customer_name or item.title }}</strong><p>{{ item.summary }}</p><small>{{ item.address_text }}</small>{% if item.customer_contact %}<small><b>연락</b> · {{ item.customer_contact }}</small>{% endif %}</div><span aria-hidden="true">›</span></a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="calendar-empty"><strong>이날은 잡힌 견적 방문이 없습니다.</strong><p>점이 표시된 날짜를 누르면 시간순 방문 동선이 나타납니다.</p></div>
+    {% endif %}
+  </section>
+
+  <details class="form-disclosure visit-manual"{% if errors %} open{% endif %}>
+    <summary><span><strong>직접 방문 일정 추가</strong><small>카카오톡에 없는 예외 일정만 직접 입력합니다.</small></span><span aria-hidden="true">+</span></summary>
+    <form class="disclosure-form" action="/estimate-visits" method="post" novalidate>
+      {{ csrf(csrf_token) }}
+      {% if errors %}<div class="form-error-summary" role="alert"><strong>저장하지 못했습니다.</strong><p>표시된 항목을 확인해 주세요.</p></div>{% endif %}
+      <div class="field-grid">
+        <div class="field{% if errors.get('start_at') %} field--invalid{% endif %}"><label for="visit-start">방문 날짜와 시간 <span class="required">필수</span></label><input id="visit-start" name="start_at" type="datetime-local" required value="{{ values.get('start_at','') }}">{{ field_error(errors, "start_at") }}</div>
+        <div class="field{% if errors.get('customer_name') %} field--invalid{% endif %}"><label for="visit-customer">고객 또는 구분할 이름 <span class="required">필수</span></label><input id="visit-customer" name="customer_name" type="text" required maxlength="200" value="{{ values.get('customer_name','') }}" placeholder="예: 월곶 비닐하우스 고객">{{ field_error(errors, "customer_name") }}</div>
+        <div class="field field--full{% if errors.get('address') %} field--invalid{% endif %}"><label for="visit-address">방문 주소 <span class="required">필수</span></label><input id="visit-address" name="address" type="text" required maxlength="1000" value="{{ values.get('address','') }}">{{ field_error(errors, "address") }}</div>
+        <div class="field field--full{% if errors.get('summary') %} field--invalid{% endif %}"><label for="visit-summary">요청받은 철거 내용 <span class="required">필수</span></label><textarea id="visit-summary" name="summary" rows="3" required maxlength="3000">{{ values.get('summary','') }}</textarea>{{ field_error(errors, "summary") }}</div>
+        <div class="field field--full"><label for="visit-contact">연락처 <span class="optional">선택</span></label><input id="visit-contact" name="contact" type="text" maxlength="300" value="{{ values.get('contact','') }}"></div>
+        <div class="field field--full"><label for="visit-notes">메모 <span class="optional">선택</span></label><textarea id="visit-notes" name="notes" rows="2" maxlength="3000">{{ values.get('notes','') }}</textarea></div>
+      </div>
+      <div class="form-actions"><p>작업 일정과 시간이 겹쳐도 막지 않습니다.</p><button class="button button--primary" type="submit">견적 방문 저장</button></div>
+    </form>
+  </details>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_macros.html" import money, empty_state %}
+
+{% block title %}현장 · Field Brain{% endblock %}
+{% block page_heading %}현장{% endblock %}
+{% block page_intro %}<p class="page-intro">각 현장의 현재 상황, 다음 일정과 남은 일을 이어서 봅니다.</p>{% endblock %}
+{% block page_actions %}<a class="button button--primary" href="/sites/new">새 현장 만들기</a>{% endblock %}
+
+{% block content %}
+  {% set site_rows = sites if sites is defined else [] %}
+  <section class="panel panel--flush" aria-labelledby="site-list-heading">
+    <div class="list-toolbar">
+      <div>
+        <p class="eyebrow">전체 {{ site_rows|length }}개</p>
+        <h2 id="site-list-heading">현장 목록</h2>
+      </div>
+      <form class="search-form" action="/sites" method="get" role="search">
+        <label class="sr-only" for="site-search">현장명 또는 주소 검색</label>
+        <input id="site-search" name="q" type="search" value="{{ q or '' }}" placeholder="현장명 또는 주소 검색">
+        <button class="button button--secondary" type="submit">찾기</button>
+      </form>
+    </div>
+
+    {% if site_rows %}
+      <div class="site-card-grid">
+        {% for site in site_rows %}
+          <a class="site-card" href="/sites/{{ site.get('id') }}">
+            <div class="site-card__top">
+              <span class="stage-chip">{{ site.get("stage_label") or "단계 미정" }}</span>
+            </div>
+            <h3>{{ site.get("name") }}</h3>
+            <p class="site-card__address">{{ site.get("address_display") or "주소 미입력" }}</p>
+            <div class="site-card__next">
+              <span>다음 할 일</span>
+              <strong>{{ site.get("next_task") or "아직 정하지 않음" }}</strong>
+            </div>
+            <small class="site-card__updated">{% if site.get("updated_at_label") %}최근 변경 {{ site.get("updated_at_label") }}{% else %}최근 변경 시각 미확인{% endif %}</small>
+          </a>
+        {% endfor %}
+      </div>
+    {% elif q %}
+      {{ empty_state("찾는 현장이 없습니다", "검색어를 줄이거나 다른 이름으로 다시 찾아보세요.", "/sites", "전체 현장 보기") }}
+    {% else %}
+      {{ empty_state("아직 만든 현장이 없습니다", "전화로 문의받은 현장도 먼저 만들어 두면 견적과 약속을 놓치지 않습니다.", "/sites/new", "첫 현장 만들기") }}
+    {% endif %}
+  </section>
+{% endblock %}

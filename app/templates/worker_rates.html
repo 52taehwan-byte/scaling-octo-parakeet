@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf, money %}
+{% block page_heading %}작업자 일당{% endblock %}
+{% block content %}
+<section class="panel site-now-card"><p>일지에 쓰는 이름으로 등록하세요. 우즈벡처럼 기록하는 인원 구분도 등록할 수 있습니다.</p>
+<form method="post" action="/worker-rates">{{ csrf(csrf_token) }}
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<div class="field-grid"><div class="field"><label for="worker-name">이름 또는 인원 구분</label><input id="worker-name" name="name" required maxlength="100" value="{{ values.get('name','') }}" placeholder="예: 아마라"></div>
+<div class="field"><label for="worker-amount">하루 일당 (원)</label><input id="worker-amount" name="amount" required inputmode="numeric" value="{{ values.get('amount','') }}" placeholder="예: 150000"></div>
+<div class="field"><label for="worker-effective">적용 시작일</label><input id="worker-effective" name="effective_on" type="date" required value="{{ values.get('effective_on',today) }}"></div></div>
+<p>“아마라 하루 일했음”은 1일, “아마라 반나절 일했음”은 0.5일로 계산합니다. 근무량이 없으면 금액을 계산하지 않습니다. 계산액은 인건비 예상액이며 실제 지출에 중복으로 더하지 않습니다.</p>
+<button class="button button--primary">일당 저장</button> <a href="/ledger?filter=cost">지출 장부</a></form></section>
+<section class="panel site-now-card"><h2>등록 이력</h2><p>일당을 바꾸려면 같은 이름으로 적용 시작일과 새 금액을 등록하세요. 해당 작업 날짜에 적용되는 일당을 사용합니다.</p><ul class="site-now-list">{% for rate in rates|reverse %}<li><strong>{{ rate.name }} · {{ money(rate.amount) }}</strong><small>{{ rate.effective_on }}부터</small></li>{% else %}<li>등록된 일당이 없습니다.</li>{% endfor %}</ul></section>
+{% endblock %}

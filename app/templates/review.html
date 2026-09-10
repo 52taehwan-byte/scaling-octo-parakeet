@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import review_badge, epistemic_badge, empty_state, csrf %}
+
+{% block title %}검토함 · Field Brain{% endblock %}
+{% block page_heading %}검토함{% endblock %}
+{% block page_intro %}<p class="page-intro">AI가 정리했거나 서로 충돌하는 내용을 사람이 확인하는 곳입니다.</p>{% endblock %}
+
+{% block content %}
+  {% set rows = review_items if review_items is defined else [] %}
+  <section class="review-guide" aria-label="검토 방법">
+    <div><span>1</span><p><strong>원문 확인</strong>통화·문자·현장 메모와 맞는지 봅니다.</p></div>
+    <div><span>2</span><p><strong>확정·보류·제외</strong>모르면 보류하고 억지로 채우지 않습니다.</p></div>
+    <div><span>3</span><p><strong>이력 보존</strong>무엇을 왜 바꿨는지 남깁니다.</p></div>
+  </section>
+
+  <section class="panel panel--flush" aria-labelledby="review-list-heading">
+    <div class="list-toolbar">
+      <div><p class="eyebrow">사람이 확인할 차례</p><h2 id="review-list-heading">검토할 기록 {% if rows %}{{ rows|length }}건{% endif %}</h2></div>
+      {% if rows %}<p class="section-help">위에서부터 한 건씩 확인하세요.</p>{% endif %}
+    </div>
+
+    {% if rows %}
+      <div class="review-list">
+        {% for item in rows %}
+          <article class="review-card">
+            <div class="review-card__meta">
+              {{ review_badge(item.get("review_status")) }}
+              {{ epistemic_badge(item.get("epistemic_status")) }}
+              <span class="meta-text">{{ item.get("type_label") or "업무 기록" }}{% if item.get("created_at_label") %} · {{ item.get("created_at_label") }}{% endif %}</span>
+            </div>
+            <div class="review-card__body">
+              <div>
+                <p class="eyebrow">{{ item.get("site_name") or "현장 미지정" }}</p>
+                <h3>{{ item.get("title") }}</h3>
+                <p>{{ item.get("reason") or "내용을 확인하고 확정해 주세요." }}</p>
+              </div>
+              {% if item.get("proposed_value") is not none %}
+                <div class="proposed-value"><span>정리된 값</span><strong>{{ item.get("proposed_value") }}</strong></div>
+              {% endif %}
+            </div>
+            {% if item.get("source_excerpt") %}
+              <blockquote class="source-quote"><span>이 값을 찾은 문장</span><p>{{ item.get("source_excerpt") }}</p></blockquote>
+            {% endif %}
+            {% if item.get("target_type") == "money_item" %}
+              <details class="review-actions candidate-edit"{% if open_edit_id and open_edit_id|string == item.get('id')|string %} open{% endif %}>
+                <summary>금액이나 분류 고치기 <span aria-hidden="true">+</span></summary>
+                <form action="/review/{{ item.get('id') }}/money-correction" method="post">
+                  {{ csrf(csrf_token if csrf_token is defined else "") }}
+                  <div class="field-grid">
+                    <div class="field"><label for="money-amount-{{ item.get('id') }}">올바른 금액</label><input id="money-amount-{{ item.get('id') }}" name="amount" inputmode="numeric" value="{{ item.get('amount_value') if item.get('amount_value') is not none else '' }}" placeholder="예: 300000"><p class="field-help">원 단위 숫자만 적으세요. 모르면 비워둘 수 있습니다.</p></div>
+                    <div class="field"><label for="money-purpose-{{ item.get('id') }}">돈의 종류</label><select id="money-purpose-{{ item.get('id') }}" name="purpose" required>
+                      {% for value, label in [('base_quote','견적금액'),('labor_cost','작업자 인건비'),('equipment_cost','장비작업자'),('waste_cost','폐기물 처리'),('material_cost','자재비'),('transport_cost','운반·주유비'),('outsource_cost','외주비'),('scrap_income','고물 판매수익'),('commission','수수료'),('other','기타')] %}<option value="{{ value }}"{% if item.get('purpose') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select></div>
+                    <div class="field field--full"><label for="money-note-{{ item.get('id') }}">장부에 남길 내용</label><textarea id="money-note-{{ item.get('id') }}" name="note" rows="2" required maxlength="3000">{{ item.get('note') }}</textarea></div>
+                    <div class="field field--full"><label for="money-reason-{{ item.get('id') }}">왜 고쳤나요?</label><textarea id="money-reason-{{ item.get('id') }}" name="reason" rows="2" required maxlength="2000" placeholder="예: 200원은 kg당 단가이고 실제 받은 총액은 30만원임"></textarea></div>
+                  </div>
+                  <div class="form-actions"><p>기존 원문은 그대로 남고, 고친 값이 장부에 확정됩니다.</p><button class="button button--primary" type="submit">고쳐서 확정</button></div>
+                </form>
+              </details>
+            {% endif %}
+            {% if item.get("is_schedule") %}
+              <details class="review-actions candidate-edit"{% if open_edit_id and open_edit_id|string == item.get('id')|string %} open{% endif %}>
+                <summary>내용이 다르면 수정하기 <span aria-hidden="true">+</span></summary>
+                <form action="/review/{{ item.get('id') }}/schedule-correction" method="post">
+                  {{ csrf(csrf_token if csrf_token is defined else "") }}
+                  <div class="field-grid">
+                    <div class="field field--full"><label for="edit-title-{{ item.get('id') }}">일정 이름</label><input id="edit-title-{{ item.get('id') }}" name="title" value="{{ item.get('title') }}" required maxlength="200"></div>
+                    <div class="field"><label for="edit-start-date-{{ item.get('id') }}">시작 날짜</label><input id="edit-start-date-{{ item.get('id') }}" type="date" name="start_date" value="{{ item.get('start_date_value') }}" required></div>
+                    <div class="field"><label for="edit-start-time-{{ item.get('id') }}">시작 시간 <span class="optional">선택</span></label><input id="edit-start-time-{{ item.get('id') }}" type="time" name="start_time" value="{{ item.get('start_time_value') }}"><p class="field-help">모르면 비워 두면 ‘시간 미정’으로 표시됩니다.</p></div>
+                    <div class="field"><label for="edit-end-date-{{ item.get('id') }}">마지막 날짜 <span class="optional">선택</span></label><input id="edit-end-date-{{ item.get('id') }}" type="date" name="end_date" value="{{ item.get('end_date_value') }}"></div>
+                    <div class="field"><label for="edit-end-time-{{ item.get('id') }}">마지막 시간 <span class="optional">선택</span></label><input id="edit-end-time-{{ item.get('id') }}" type="time" name="end_time" value="{{ item.get('end_time_value') }}"></div>
+                    <div class="field field--full"><label for="edit-summary-{{ item.get('id') }}">작업·방문 내용</label><textarea id="edit-summary-{{ item.get('id') }}" name="summary" rows="3" required maxlength="3000">{{ item.get('summary') }}</textarea></div>
+                    <div class="field field--full"><label for="edit-address-{{ item.get('id') }}">주소 <span class="optional">선택</span></label><input id="edit-address-{{ item.get('id') }}" name="address_text" value="{{ item.get('address_text') }}" maxlength="1000"></div>
+                    <div class="field field--full"><label for="edit-site-{{ item.get('id') }}">연결할 현장{% if item.get('schedule_type') == 'work' %} <span class="required">필수</span>{% else %} <span class="optional">선택</span>{% endif %}</label><select id="edit-site-{{ item.get('id') }}" name="site_id"{% if item.get('schedule_type') == 'work' %} required{% endif %}><option value="">현장에 연결하지 않음</option>{% for site in review_sites %}<option value="{{ site.get('id') }}"{% if site.get('id') == item.get('site_id') %} selected{% endif %}>{{ site.get('name') }}</option>{% endfor %}</select><p class="field-help">이미 있는 현장과 같은 건이라면 그 현장을 선택하세요.</p></div>
+                    <div class="field field--full"><label for="edit-reason-{{ item.get('id') }}">수정 이유 <span class="required">필수</span></label><textarea id="edit-reason-{{ item.get('id') }}" name="reason" rows="2" required maxlength="2000" placeholder="예: 카카오톡 원문에서 날짜를 다시 확인함"></textarea></div>
+                  </div>
+                  <div class="form-actions"><p>원문은 그대로 보존되고, 바꾼 내용과 이유가 이력에 남습니다.</p><button class="button button--secondary" type="submit">수정 내용 저장</button></div>
+                </form>
+              </details>
+            {% endif %}
+            <details class="review-actions"{% if open_review_id and open_review_id|string == item.get('id')|string %} open{% endif %}>
+              <summary>이 기록 검토하기 <span aria-hidden="true">+</span></summary>
+              <form action="/review/{{ item.get('id') }}" method="post">
+                {{ csrf(csrf_token if csrf_token is defined else "") }}
+                <input type="hidden" name="target_type" value="{{ item.get('target_type') }}">
+                <fieldset>
+                  <legend>검토 결과</legend>
+                  <label class="radio-card"><input type="radio" name="decision" value="approved" required><span><strong>그대로 확정</strong><small>원문과 맞고 업무에 사용해도 됩니다.</small></span></label>
+                  <label class="radio-card"><input type="radio" name="decision" value="held" required><span><strong>보류</strong><small>아직 확인할 수 없어 확정하지 않습니다.</small></span></label>
+                  <label class="radio-card"><input type="radio" name="decision" value="rejected" required><span><strong>제외</strong><small>잘못 연결됐거나 사용할 수 없는 기록입니다.</small></span></label>
+                </fieldset>
+                <div class="field"><label for="review-reason-{{ item.get('id') }}">판단 근거 <span class="required">필수</span></label><textarea id="review-reason-{{ item.get('id') }}" name="reason" rows="3" required maxlength="2000" placeholder="무엇을 확인했고 왜 이렇게 판단했는지"></textarea></div>
+                <p class="field-help">{% if item.get("target_type") == "money_item" %}금액이나 분류가 다르면 위에서 먼저 고쳐서 확정하세요.{% elif item.get("is_schedule") %}일정 내용이 다르면 위에서 먼저 고친 뒤 확정하세요.{% else %}원문과 맞는지 확인한 뒤 선택하세요.{% endif %}</p>
+                <div class="form-actions"><a class="text-link" href="{{ item.get('source_url') or ('/sites/' ~ item.get('site_id') ~ '#timeline') }}">현장 원문 보기</a><button class="button button--primary" type="submit">검토 결과 저장</button></div>
+              </form>
+            </details>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="review-empty">
+        <span class="review-empty__check" aria-hidden="true">✓</span>
+        <h2>지금 검토할 기록이 없습니다.</h2>
+        <p>확정되지 않은 금액, AI가 추출한 내용, 서로 충돌하는 정보가 생기면 이곳에 모입니다.</p>
+        <a class="button button--secondary" href="/sites">현장 기록 보기</a>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

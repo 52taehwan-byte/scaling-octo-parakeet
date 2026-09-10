@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field_error, csrf %}
+
+{% block title %}새 현장 · Field Brain{% endblock %}
+{% block eyebrow %}<p class="eyebrow">첫 기록</p>{% endblock %}
+{% block page_heading %}새 현장 만들기{% endblock %}
+{% block page_intro %}<p class="page-intro">지금 아는 만큼만 적으세요. 모르는 금액과 일정은 비워 두면 됩니다.</p>{% endblock %}
+{% block page_actions %}<a class="button button--secondary" href="/sites">취소</a>{% endblock %}
+
+{% block content %}
+  {% set values = form_values if form_values is defined else {} %}
+  {% set errors = form_errors if form_errors is defined else {} %}
+  <section class="form-layout">
+    <form class="panel form-card" action="/sites" method="post" novalidate>
+      {{ csrf(csrf_token if csrf_token is defined else "") }}
+      {% if errors %}
+        <div class="form-error-summary" role="alert">
+          <strong>저장하지 못했습니다.</strong>
+          <p>표시된 항목을 확인한 뒤 다시 저장해 주세요.</p>
+        </div>
+      {% endif %}
+
+      <div class="form-section">
+        <div class="form-section__heading">
+          <span>1</span>
+          <div><h2>어떤 현장인가요?</h2><p>나중에 바로 알아볼 수 있는 짧은 이름이면 충분합니다.</p></div>
+        </div>
+        <div class="field-grid">
+          <div class="field field--full{% if errors.get('name') %} field--invalid{% endif %}">
+            <label for="site-name">현장명 <span class="required">필수</span></label>
+            <input id="site-name" name="name" type="text" required maxlength="120" value="{{ values.get('name', '') }}" placeholder="예: 새봄 매장 원상복구 (가상 예시)"{% if errors.get('name') %} aria-invalid="true" aria-describedby="error-name"{% endif %}>
+            {{ field_error(errors, "name") }}
+          </div>
+          <div class="field field--full{% if errors.get('address') %} field--invalid{% endif %}">
+            <label for="site-address">주소 <span class="optional">선택</span></label>
+            <input id="site-address" name="address" type="text" maxlength="240" value="{{ values.get('address', '') }}" placeholder="예: 경기도 ○○시 ○○로 (가상 예시)"{% if errors.get('address') %} aria-invalid="true" aria-describedby="error-address"{% endif %}>
+            <p class="field-help">상세 호수는 꼭 필요할 때만 적으세요.</p>
+            {{ field_error(errors, "address") }}
+          </div>
+          <div class="field{% if errors.get('stage') %} field--invalid{% endif %}">
+            <label for="site-stage">현재 단계</label>
+            <select id="site-stage" name="stage"{% if errors.get('stage') %} aria-invalid="true" aria-describedby="error-stage"{% endif %}>
+              <option value="inquiry"{% if values.get('stage', 'inquiry') == 'inquiry' %} selected{% endif %}>문의 받음</option>
+              <option value="survey"{% if values.get('stage') == 'survey' %} selected{% endif %}>현장 확인</option>
+              <option value="quoted"{% if values.get('stage') == 'quoted' %} selected{% endif %}>견적 제출</option>
+              <option value="scheduled"{% if values.get('stage') == 'scheduled' %} selected{% endif %}>작업 예정</option>
+              <option value="in_progress"{% if values.get('stage') == 'in_progress' %} selected{% endif %}>작업 중</option>
+              <option value="completed"{% if values.get('stage') == 'completed' %} selected{% endif %}>작업 완료</option>
+              <option value="paused"{% if values.get('stage') == 'paused' %} selected{% endif %}>보류</option>
+            </select>
+            {{ field_error(errors, "stage") }}
+          </div>
+          <div class="field{% if errors.get('start_date') %} field--invalid{% endif %}">
+            <label for="site-start-date">예정 시작일 <span class="optional">선택</span></label>
+            <input id="site-start-date" name="start_date" type="date" value="{{ values.get('start_date', '') }}"{% if errors.get('start_date') %} aria-invalid="true" aria-describedby="error-start_date"{% endif %}>
+            {{ field_error(errors, "start_date") }}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section__heading">
+          <span>2</span>
+          <div><h2>누구에게 받은 일인가요?</h2><p>모르면 비워 두고 현장을 만든 뒤 추가할 수 있습니다.</p></div>
+        </div>
+        <div class="field-grid">
+          <div class="field{% if errors.get('customer_name') %} field--invalid{% endif %}">
+            <label for="customer-name">고객 또는 담당자 이름 <span class="optional">선택</span></label>
+            <input id="customer-name" name="customer_name" type="text" maxlength="120" value="{{ values.get('customer_name', '') }}" placeholder="예: 김고객 (가상 예시)"{% if errors.get('customer_name') %} aria-invalid="true" aria-describedby="error-customer_name"{% endif %}>
+            {{ field_error(errors, "customer_name") }}
+          </div>
+          <div class="field{% if errors.get('customer_contact') %} field--invalid{% endif %}">
+            <label for="customer-contact">연락처 메모 <span class="optional">선택</span></label>
+            <input id="customer-contact" name="customer_contact" type="text" maxlength="160" value="{{ values.get('customer_contact', '') }}" placeholder="전화번호 또는 연락 방법"{% if errors.get('customer_contact') %} aria-invalid="true" aria-describedby="error-customer_contact"{% endif %}>
+            {{ field_error(errors, "customer_contact") }}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section__heading">
+          <span>3</span>
+          <div><h2>첫 원문을 남겨 주세요</h2><p>통화나 문자에서 확인한 범위를 그대로 남기면 나중에 바뀐 내용을 비교할 수 있습니다.</p></div>
+        </div>
+        <div class="field field--full{% if errors.get('source_note') %} field--invalid{% endif %}">
+          <label for="source-note">받은 내용 <span class="optional">선택</span></label>
+          <textarea id="source-note" name="source_note" rows="6" maxlength="5000" placeholder="예: 전화로 바닥과 가벽 철거를 문의받음. 정확한 범위는 현장 확인 후 확정하기로 함."{% if errors.get('source_note') %} aria-invalid="true" aria-describedby="error-source_note"{% endif %}>{{ values.get('source_note', '') }}</textarea>
+          <p class="field-help">추정해서 채우지 말고, 실제로 들은 말과 모르는 점을 함께 적으세요.</p>
+          {{ field_error(errors, "source_note") }}
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <p>저장 뒤 사람, 할 일, 돈, 위험을 차례로 추가할 수 있습니다.</p>
+        <button class="button button--primary" type="submit">현장 만들기</button>
+      </div>
+    </form>
+
+    <aside class="panel guide-card" aria-label="기록 원칙">
+      <p class="eyebrow">기록 원칙</p>
+      <h2>모르는 것은 비워 둡니다.</h2>
+      <ul class="check-list">
+        <li><strong>금액 미확인</strong><span>0원을 넣지 않습니다.</span></li>
+        <li><strong>범위 불확실</strong><span>검토 필요로 남깁니다.</span></li>
+        <li><strong>원문 보존</strong><span>들었던 말은 고쳐 쓰지 않습니다.</span></li>
+        <li><strong>사람이 확정</strong><span>AI 제안은 확인 뒤 사용합니다.</span></li>
+      </ul>
+    </aside>
+  </section>
+{% endblock %}

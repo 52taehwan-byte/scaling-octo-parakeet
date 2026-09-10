@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field_error %}
+{% block title %}지출 기록 · Field Brain{% endblock %}{% block eyebrow %}{% endblock %}{% block page_heading %}지출 기록{% endblock %}
+{% block page_intro %}<p class="page-intro">실제로 쓴 돈 한 건만 간단히 남깁니다.</p>{% endblock %}
+{% block top_actions %}<a class="button button--ghost" href="/ledger">장부로 돌아가기</a>{% endblock %}
+{% block content %}
+{% set v = form_values or {} %}{% set e = form_errors or {} %}
+<form class="panel expense-entry-form" action="/ledger/expense/new" method="post" novalidate>
+  {{ csrf(csrf_token if csrf_token is defined else "") }}
+  {% if e %}<div class="form-error-summary" role="alert"><strong>확인할 내용이 있습니다.</strong><p>현장, 지출 종류, 금액과 날짜를 확인해 주세요.</p></div>{% endif %}
+  <div class="field-grid">
+    <div class="field field--full{% if e.get('site_id') %} field--invalid{% endif %}"><label for="expense-site">어느 현장인가요?</label><select id="expense-site" name="site_id" required><option value="">현장 선택</option>{% for site in sites %}<option value="{{ site.id }}"{% if v.get('site_id') == site.id %} selected{% endif %}>{{ site.name }}</option>{% endfor %}</select>{{ field_error(e, 'site_id') }}</div>
+    <div class="field field--full"><label for="expense-category">어디에 쓴 돈인가요?</label><select id="expense-category" name="category" required><option value="">지출 종류 선택</option>{% for key, label in [('worker','직접 인건비'),('outsource','외주비'),('equipment','장비비 · 기사 포함'),('debris','폐기물 · 왈가닥'),('mixed_waste','폐기물 · 종합폐기물'),('scrap_disposal','폐기물 · 고물 처리'),('materials','자재·소모품비'),('fuel','차량 · 주유비'),('vehicle','차량 · 통행·주차·운반'),('food','식비'),('drink','음료비'),('other','기타 비용')] %}<option value="{{ key }}"{% if v.get('category') == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{{ field_error(e, 'category') }}<p class="field-help">기사 포함 장비 비용은 장비비에, 자재 포함 외주 금액은 외주비에 한 번만 기록합니다.</p></div>
+    <div class="field{% if e.get('amount') %} field--invalid{% endif %}"><label for="expense-amount">얼마를 썼나요?</label><input id="expense-amount" name="amount" inputmode="numeric" required value="{{ v.get('amount','') }}" placeholder="예: 150000">{{ field_error(e, 'amount') }}<p class="field-help">15만원이면 150000으로 적으세요.</p></div>
+    <div class="field{% if e.get('occurred_on') %} field--invalid{% endif %}"><label for="expense-date">언제 썼나요?</label><input id="expense-date" type="date" name="occurred_on" required value="{{ v.get('occurred_on','') }}">{{ field_error(e, 'occurred_on') }}</div>
+    <div class="field field--full{% if e.get('note') %} field--invalid{% endif %}"><label for="expense-note">무슨 돈인가요?</label><textarea id="expense-note" name="note" rows="4" required maxlength="3000" placeholder="예: 아마라 하루 인건비">{{ v.get('note','') }}</textarea>{{ field_error(e, 'note') }}</div>
+  </div>
+  <div class="capture-assurance"><span aria-hidden="true">✓</span><p><strong>저장하면 바로 확정 지출에 반영됩니다.</strong>잘못 적은 경우에도 원래 기록과 수정 이력을 보존합니다.</p></div>
+  <div class="form-actions"><a class="text-link" href="/ledger">취소</a><button class="button button--primary" type="submit">지출 저장</button></div>
+</form>
+{% endblock %}

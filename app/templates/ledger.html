@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import money %}
+{% block title %}사업 장부 · Field Brain{% endblock %}{% block eyebrow %}{% endblock %}{% block page_heading %}사업 장부{% endblock %}
+{% block page_intro %}<p class="page-intro">현장별 견적과 실제 지출을 모아 사업의 결과를 보는 곳입니다.</p>{% endblock %}
+{% block top_actions %}<a class="button button--primary" href="/ledger/expense/new">지출 기록</a>{% endblock %}
+{% block content %}
+<p><a class="button button--secondary" href="/worker-rates">작업자 일당 관리</a></p>
+<section class="ledger-howto" aria-labelledby="ledger-howto-title">
+  <div><span aria-hidden="true">✓</span><div><strong id="ledger-howto-title">장부는 자동으로 정리됩니다</strong><p>작업일지와 현장 기록에서 견적과 지출을 모읍니다. 틀린 금액은 해당 현장에서 바로 고칩니다.</p></div></div>
+</section>
+<section class="ledger-summary ledger-summary--simple" aria-label="사업 손익 요약">
+  <article><span>수주된 견적금액</span><strong>{{ money(quote_revenue) }}</strong><small>고객과 합의된 금액 · 입금액과는 다릅니다</small></article>
+  <article><span>확정 지출</span><strong>{% if estimated_cost is none %}확정 기록 없음{% else %}{{ money(estimated_cost) }}{% endif %}</strong></article>
+  <article class="ledger-summary__balance"><span>현재까지 남은 금액</span><strong>{% if estimated_margin is none %}계산 전{% else %}{{ money(estimated_margin) }}{% endif %}</strong><small>수주금액 − 기록된 실제 지출 · 남은 비용 발생 시 줄어듭니다</small></article>
+</section>
+<section class="cost-breakdown"><div class="simple-heading"><h2>확정 지출</h2><a href="/ledger?filter=cost">지출 내역 보기</a></div><div>{% for label, amount in cost_groups %}<article><span>{{ label }}</span><strong>{% if amount is none %}확정 기록 없음{% else %}{{ money(amount) }}{% endif %}</strong></article>{% endfor %}</div></section>
+<nav class="ledger-filter" aria-label="장부 보기"><a class="{% if filter == 'all' %}is-active{% endif %}" href="/ledger">요약</a><a class="{% if filter == 'quote' %}is-active{% endif %}" href="/ledger?filter=quote">견적 내역</a><a class="{% if filter == 'cost' %}is-active{% endif %}" href="/ledger?filter=cost">지출 내역</a></nav>
+
+{% if filter == 'all' %}
+<section class="ledger-next-step"><strong>어떻게 사용하나요?</strong><ol><li>평소처럼 하루 작업일지를 자유롭게 씁니다.</li><li>Field Brain이 견적과 지출을 현장별로 모읍니다.</li><li>잘못 정리된 내용만 해당 현장에서 수정합니다.</li></ol></section>
+{% endif %}
+
+{% if filter == 'quote' %}
+<section class="ledger-section">
+  <div class="simple-heading"><h2>견적 내역</h2><span>확인된 고객 견적만 표시합니다.</span></div>
+  {% if quote_rows %}<div class="cash-list">{% for row in quote_rows %}<a class="cash-row" href="/sites/{{ row.site_id }}#money"><span class="cash-row__sign cash-row__sign--{{ row.direction }}">＋</span><span class="cash-row__body"><strong>{{ row.note }}</strong><small>{{ row.site_name }}{% if row.occurred_on_label %} · {{ row.occurred_on_label }}{% endif %}</small></span><span class="cash-row__amount"><strong>{{ money(row.amount) }}</strong><small>{{ row.actualness_label }} · {{ row.progression_label }}</small></span><b aria-hidden="true">›</b></a>{% endfor %}</div>{% else %}<div class="simple-empty">아직 확인된 견적금액이 없습니다.</div>{% endif %}
+</section>
+{% endif %}
+
+{% if filter == 'cost' %}
+<section class="ledger-section">
+  <div class="simple-heading"><h2>지출 내역</h2><span>확인된 비용만 표시합니다.</span></div>
+  <div class="expense-groups">
+  {% for group in expense_groups %}
+    <article class="expense-group expense-group--{{ group.key }}">
+      <header><div><span>{{ loop.index }}</span><h3>{{ group.label }}</h3></div><strong>{% if group.total is none %}확정 기록 없음{% else %}{{ money(group.total) }}{% endif %}</strong></header>
+      <div class="expense-subgroups">
+      {% for item in group["items"] %}
+        <section class="expense-subgroup{% if not item.rows %} is-empty{% endif %}">
+          <div class="expense-subgroup__heading"><h4>{{ item.label }}</h4><span>{% if item.rows %}{{ item.rows|length }}건 · {{ money(item.total) }}{% else %}확정 기록 없음{% endif %}</span></div>
+          {% if item.rows %}<div class="cash-list cash-list--compact">{% for row in item.rows %}<a class="cash-row" href="/sites/{{ row.site_id }}#money"><span class="cash-row__sign cash-row__sign--out">−</span><span class="cash-row__body"><strong>{{ row.note }}</strong><small>{{ row.site_name }}{% if row.occurred_on_label %} · {{ row.occurred_on_label }}{% endif %}</small></span><span class="cash-row__amount"><strong>{{ money(row.amount) }}</strong><small>{{ row.actualness_label }} · {{ row.progression_label }}</small></span><b aria-hidden="true">›</b></a>{% endfor %}</div>{% endif %}
+        </section>
+      {% endfor %}
+      </div>
+    </article>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+<p class="ledger-note">계약금·중도금·잔금·미수금 추적은 제외합니다. 이 화면은 견적금액, 실행비와 마진 판단에 집중합니다.</p>
+{% endblock %}

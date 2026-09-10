@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}Field Brain{% endblock %}</title>
+  <link rel="stylesheet" href="{{ request.url_for('static', path='app.css') }}">
+  <script defer src="{{ request.url_for('static', path='app.js') }}"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">본문으로 바로가기</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Field Brain 메뉴">
+      <a class="brand" href="/" aria-label="Field Brain 오늘의 현장판">
+        <span class="brand__mark" aria-hidden="true">FB</span>
+        <span class="brand__copy">
+          <strong>Field Brain</strong>
+          <small>철거 사업 실전판</small>
+        </span>
+      </a>
+
+      <nav class="primary-nav" aria-label="주요 메뉴">
+        <a class="nav-link{% if active_page == 'dashboard' %} is-active{% endif %}" href="/"{% if active_page == 'dashboard' %} aria-current="page"{% endif %}>
+          <span class="nav-link__icon" aria-hidden="true">●</span>
+          <span>오늘</span>
+        </a>
+        <a class="nav-link{% if active_page in ['schedules','work_schedules','estimate_visits'] %} is-active{% endif %}" href="/schedules"{% if active_page in ['schedules','work_schedules','estimate_visits'] %} aria-current="page"{% endif %}>
+          <span class="nav-link__icon" aria-hidden="true">□</span>
+          <span>일정</span>
+        </a>
+        <a class="nav-link{% if active_page == 'sites' %} is-active{% endif %}" href="/sites"{% if active_page == 'sites' %} aria-current="page"{% endif %}>
+          <span class="nav-link__icon" aria-hidden="true">⌂</span>
+          <span>현장</span>
+        </a>
+        <a class="nav-link{% if active_page == 'records' %} is-active{% endif %}" href="/records"{% if active_page == 'records' %} aria-current="page"{% endif %}>
+          <span class="nav-link__icon" aria-hidden="true">＋</span>
+          <span>기록</span>
+        </a>
+        <a class="nav-link{% if active_page == 'business' %} is-active{% endif %}" href="/business"{% if active_page == 'business' %} aria-current="page"{% endif %}>
+          <span class="nav-link__icon" aria-hidden="true">↗</span>
+          <span>사업</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-note">
+        <strong>로컬 우선</strong>
+        <p>고객 자료는 이 컴퓨터에 보존하고, Field Brain이 먼저 업무로 정리합니다.</p>
+      </div>
+    </aside>
+
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="topbar__copy">
+          {% block eyebrow %}<p class="eyebrow">철거 사업을 함께 기억하는 AI</p>{% endblock %}
+          <h1>{% block page_heading %}Field Brain{% endblock %}</h1>
+          {% block page_intro %}{% endblock %}
+        </div>
+        <div class="topbar__actions">
+          {% block page_actions %}{% endblock %}
+        </div>
+      </header>
+
+      {% if demo_mode %}
+        <div class="notice notice--demo" role="status">
+          <div>
+            <strong>가상 데모 모드</strong>
+            <p>화면의 사람·현장·금액은 모두 테스트용이며 실제 업무 원장과 완전히 분리돼 있습니다.</p>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if global_error %}
+        <div class="notice notice--error" role="alert">
+          <div>
+            <strong>처리하지 못했습니다.</strong>
+            <p>{{ global_error }}</p>
+          </div>
+        </div>
+      {% endif %}
+      {% if notice %}
+        <div class="notice notice--success" role="status" data-dismissible>
+          <div>
+            <strong>완료했습니다.</strong>
+            <p>{{ notice }}</p>
+          </div>
+          <button class="notice__close" type="button" data-dismiss aria-label="알림 닫기">닫기</button>
+        </div>
+      {% endif %}
+
+      <main id="main-content" tabindex="-1">
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="page-footer"><p>Field Brain · 이 컴퓨터에 안전하게 저장됩니다.</p></footer>
+    </div>
+  </div>
+  <nav class="mobile-nav" aria-label="모바일 주요 메뉴">
+    <a class="{% if active_page == 'dashboard' %}is-active{% endif %}" href="/"><span>●</span>오늘</a>
+    <a class="{% if active_page in ['schedules','work_schedules','estimate_visits'] %}is-active{% endif %}" href="/schedules"><span>□</span>일정</a>
+    <a class="{% if active_page == 'sites' %}is-active{% endif %}" href="/sites"><span>⌂</span>현장</a>
+    <a class="{% if active_page == 'records' %}is-active{% endif %}" href="/records"><span>＋</span>기록</a>
+    <a class="{% if active_page == 'business' %}is-active{% endif %}" href="/business"><span>↗</span>사업</a>
+  </nav>
+</body>
+</html>
