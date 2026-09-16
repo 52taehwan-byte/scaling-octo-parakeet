@@ -124,6 +124,9 @@ def _korean_datetime(
 ) -> tuple[str, str | None, str] | None:
     if not value or any(word in value for word in ("희망", "협의", "미정", "최대한")):
         return None
+    # Expand a same-month range before matching dates (not time ranges).
+    value = re.sub(r'(\d{1,2})월\s*(\d{1,2})일\s*[-~～–]\s*(\d{1,2})일',
+                   lambda m: f'{m[1]}월 {m[2]}일 - {m[1]}월 {m[3]}일', value)
     dates = list(re.finditer(r"(?:(\d{4})년\s*)?(\d{1,2})월\s*(\d{1,2})일", value))
     if not dates:
         if reference_date is None:
@@ -138,8 +141,8 @@ def _korean_datetime(
             weekday = next((number for word, number in weekdays.items() if word in value), None)
             if weekday is not None:
                 days_ahead = (weekday - reference_date.weekday()) % 7
-                if "차주" in value:
-                    days_ahead = days_ahead + 7 if days_ahead < 7 else days_ahead
+                if "차주" in value or "다음주" in value or "다음 주" in value:
+                    days_ahead = 7 - reference_date.weekday() + weekday
                 resolved = reference_date + timedelta(days=days_ahead)
         if resolved is None:
             return None
@@ -156,6 +159,10 @@ def _korean_datetime(
         if not tm:
             return datetime(year, month, day, 0, 0, tzinfo=SEOUL), False
         hour, minute = int(tm.group(2)), int(tm.group(3) or 0)
+        if tm.group(1) and not 1 <= hour <= 12:
+            raise ValueError('invalid twelve-hour time')
+        if not tm.group(3) and re.match(r'\s*반', time_text[tm.end():]):
+            minute = 30
         if tm.group(1) == "오후" and hour < 12:
             hour += 12
         if tm.group(1) == "오전" and hour == 12:
@@ -163,10 +170,17 @@ def _korean_datetime(
         return datetime(year, month, day, hour, minute, tzinfo=SEOUL), True
 
     first_end = dates[1].start() if len(dates) > 1 else len(value)
-    start, has_time = build(dates[0], value[dates[0].end() : first_end])
-    end: datetime | None = None
-    if len(dates) > 1:
-        end, _ = build(dates[1], value[dates[1].end() :])
+    try:
+        start, has_time = build(dates[0], value[dates[0].end() : first_end])
+        end: datetime | None = None
+        if len(dates) > 2:
+            return None
+        if len(dates) > 1:
+            end, _ = build(dates[1], value[dates[1].end() :])
+            if end < start:
+                return None
+    except ValueError:
+        return None
     precision = "range" if end else "exact" if has_time else "date"
     return start.isoformat(timespec="minutes"), end.isoformat(timespec="minutes") if end else None, precision
 

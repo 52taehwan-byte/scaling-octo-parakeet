@@ -109,6 +109,17 @@ class ScheduleTests(unittest.TestCase):
         self.assertNotEqual(linked, site['id'])
         self.assertEqual(self.repo.connect_imported_visit_site(self.workspace['id'], visit['id']), linked)
 
+    def test_korean_schedule_ranges_half_hour_and_next_week(self) -> None:
+        from field_brain.schedule_import import _korean_datetime
+        start, end, precision = _korean_datetime('8월 25일 - 28일', default_year=2026)
+        self.assertEqual(start, '2026-08-25T00:00+09:00')
+        self.assertEqual(end, '2026-08-28T00:00+09:00')
+        self.assertEqual(precision, 'range')
+        self.assertEqual(_korean_datetime('9월 3일 오후 1시 반', default_year=2026)[0], '2026-09-03T13:30+09:00')
+        self.assertEqual(_korean_datetime('차주 금요일 오전 9시', default_year=2026, reference_date=date(2026,9,7))[0], '2026-09-18T09:00+09:00')
+        for text in ('2월 30일', '8월 28일 - 25일', '9월 3일 오후 25시', '9월 3일 10시 70분'):
+            self.assertIsNone(_korean_datetime(text, default_year=2026))
+
     def test_work_and_estimate_visit_can_overlap(self) -> None:
         work = self.repo.create_schedule_item(
             self.workspace["id"], "work", "월곶 현장", "2026-09-03T08:00+09:00",
