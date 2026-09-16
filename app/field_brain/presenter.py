@@ -482,6 +482,8 @@ def build_site_context(
             "review_count": len(site_pending),
             "cost_completeness": site.get("cost_completeness"),
         },
+        "linked_schedules": present_schedule_rows(site_schedules, [site]),
+        "visit_results": repo.list_site_visit_results(site["id"]),
         "recent_records": recent_records(timeline)[:3],
         "attendance": labor_forecast(timeline[0].get("summary") if timeline else None,
                                      str(timeline[0].get('occurred_at_iso') or '')[:10] if timeline else '',

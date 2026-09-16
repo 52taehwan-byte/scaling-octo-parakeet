@@ -43,6 +43,33 @@
     {% if site.get("brief_missing_labels") %}<p class="site-command__missing"><strong>아직 확인되지 않은 내용</strong> {{ site.get("brief_missing_labels")|join(" · ") }}</p>{% endif %}
   </section>
 
+  {% if linked_schedules %}
+  <section class="panel" aria-label="이 현장 예정 일정">
+    <h2>이 현장 예정 일정</h2>
+    {% for kind, label in [('work', '작업 일정'), ('estimate_visit', '견적 방문')] %}
+    {% set rows = linked_schedules|selectattr('schedule_type', 'equalto', kind)|list %}
+    {% if rows %}<h3>{{ label }}</h3><ul class="site-now-list">{% for item in rows %}<li><a href="/schedules/{{ item.id }}">{{ item.start_label }} · {{ item.summary }}</a></li>{% endfor %}</ul>{% endif %}
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% if visit_results %}
+  <section class="panel" aria-label="방문과 견적 기록">
+    <h2>방문과 견적 기록</h2>
+    <p>방문 때 남긴 내용을 그대로 연결합니다. 제안 견적은 수주금액에 합산하지 않습니다.</p>
+    {% for result in visit_results %}
+    <details class="form-disclosure"{% if loop.first %} open{% endif %}>
+      <summary>{{ result.start_at[:10] }} 방문 · 제안 견적 {{ money(result.total_quote_krw) }}{% if result.visit_status == 'cancelled' %} · 취소된 일정{% endif %}</summary>
+      <div class="disclosure-form">
+        <p style="white-space: pre-wrap">{{ result.customer_requests }}</p>
+        {% if result.work_plan %}<p style="white-space: pre-wrap">{{ result.work_plan }}</p>{% endif %}
+        {% if result.conditions_text %}<p style="white-space: pre-wrap">{{ result.conditions_text }}</p>{% endif %}
+        <a class="button button--secondary" href="/schedules/{{ result.schedule_id }}#estimate-result">방문 기록 보기·수정</a>
+      </div>
+    </details>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   <section class="site-at-glance" aria-label="현장 핵심 요약">
     <article class="panel"><span>고객 견적금액</span><strong>{{ money(f.get("agreed_customer_amount")) }}</strong></article>
     <article class="panel"><span>실행비 전망</span><strong>{{ money(f.get("estimated_cost")) }}</strong></article>

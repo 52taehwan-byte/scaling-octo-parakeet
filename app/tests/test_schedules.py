@@ -24,6 +24,28 @@ class ScheduleTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    def test_visit_outcome_stays_with_site_and_does_not_become_revenue(self) -> None:
+        from field_brain.presenter import build_site_context
+        visit = self.repo.create_schedule_item(
+            self.workspace['id'], 'estimate_visit', '가상상가',
+            '2026-09-12T11:00+09:00', '가벽 철거', site_id=self.site['id'],
+        )
+        self.repo.save_estimate_visit_result(
+            visit['id'], customer_requests='가벽 철거. 샷시는 보존.', total_quote_krw=5_000_000,
+        )
+        other = self.repo.create_site(self.workspace['id'], '다른 현장')
+        self.assertEqual(self.repo.list_site_visit_results(other['id']), [])
+        detail = build_site_context(self.repo, self.workspace['id'], self.site)
+        self.assertEqual(detail['visit_results'][0]['total_quote_krw'], 5_000_000)
+        self.assertIsNone(detail['financial']['agreed_customer_amount'])
+        self.repo.save_estimate_visit_result(
+            visit['id'], customer_requests='고객과 조정한 견적', total_quote_krw=4_800_000,
+        )
+        rows = self.repo.list_site_visit_results(self.site['id'])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['total_quote_krw'], 4_800_000)
+        self.assertEqual(rows[0]['revision'], 2)
+
     def test_work_and_estimate_visit_can_overlap(self) -> None:
         work = self.repo.create_schedule_item(
             self.workspace["id"], "work", "월곶 현장", "2026-09-03T08:00+09:00",

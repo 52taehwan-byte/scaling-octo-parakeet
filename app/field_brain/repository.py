@@ -758,6 +758,17 @@ class FieldBrainRepository:
             )
             return dict(after)
 
+    def list_site_visit_results(self, site_id: str) -> list[dict[str, Any]]:
+        """Read linked outcomes without copying proposals into the money ledger."""
+        with closing(connect(self.db_path)) as connection:
+            self._require_row(connection, "sites", site_id)
+            return [dict(row) for row in connection.execute(
+                """SELECT r.*, s.start_at, s.business_status AS visit_status
+                FROM estimate_visit_results r JOIN schedule_items s ON s.id = r.schedule_id
+                WHERE s.site_id = ? AND r.workspace_id = s.workspace_id
+                ORDER BY s.start_at DESC, r.updated_at DESC""", (site_id,)
+            ).fetchall()]
+
     def get_estimate_visit_result(self, schedule_id: str) -> dict[str, Any] | None:
         with closing(connect(self.db_path)) as connection:
             row = connection.execute(

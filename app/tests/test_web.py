@@ -522,6 +522,27 @@ class WebSmokeTestCase(unittest.TestCase):
         saved = self.app.state.repo.get_estimate_visit_result(visit["id"])
         self.assertEqual(saved["total_quote_krw"], 13_300_000)
 
+    def test_free_visit_note_is_visible_on_linked_site(self) -> None:
+        repo = self.app.state.repo
+        workspace = self.app.state.workspace_id
+        site = repo.create_site(workspace, '가상 연결 상가')
+        visit = repo.create_schedule_item(
+            workspace, 'estimate_visit', '가상 연결 상가', '2099-09-18T11:00+09:00',
+            '샷시 보존 방문', site_id=site['id'],
+        )
+        status, _, _ = self.request(
+            f"/schedules/{visit['id']}/estimate-result", method='POST',
+            form={'csrf_token': self.csrf(), 'customer_requests': '샷시는 남기고 가벽만 철거.\n고객과 협의 중.'},
+        )
+        self.assertEqual(status, 303)
+        status, _, body = self.request(f"/sites/{site['id']}")
+        self.assertEqual(status, 200)
+        html = body.decode('utf-8')
+        self.assertIn('샷시는 남기고 가벽만 철거.', html)
+        self.assertIn('샷시 보존 방문', html)
+        self.assertIn('제안 견적은 수주금액에 합산하지 않습니다.', html)
+        self.assertIn(f"/schedules/{visit['id']}#estimate-result", html)
+
     def test_schedule_detail_can_reschedule_cancel_and_restore(self) -> None:
         visit = self.app.state.repo.create_schedule_item(
             self.app.state.workspace_id, "estimate_visit", "가상 약국",

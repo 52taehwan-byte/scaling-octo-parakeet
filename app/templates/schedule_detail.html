@@ -73,7 +73,8 @@
       <form class="disclosure-form" action="/schedules/{{ schedule.id }}/estimate-result" method="post" novalidate>
         {{ csrf(csrf_token) }}
         {% if e %}<div class="form-error-summary" role="alert"><strong>확인할 내용이 있습니다.</strong><p>표시된 내용과 금액을 확인해 주세요.</p></div>{% endif %}
-        <div class="field field--full"><label for="result-requests">고객 요청 사항 <span class="required">필수</span></label><textarea id="result-requests" name="customer_requests" rows="9" required maxlength="20000" placeholder="총평수, 철거 범위, 복구 요청, 설비 매입 문의 등을 번호로 적으세요.">{{ v.get('customer_requests','') }}</textarea>{{ field_error(e, 'customer_requests') }}</div>
+        <div class="field field--full"><label for="result-requests">방문해서 보고 들은 내용</label><textarea id="result-requests" name="customer_requests" rows="12" required maxlength="20000" placeholder="고객과 나눈 이야기, 철거할 것과 남길 것, 생각한 작업 순서와 견적을 자유롭게 적거나 붙여넣으세요.">{{ v.get('customer_requests','') }}</textarea>{{ field_error(e, 'customer_requests') }}<p class="field-help">참고: 철거·보존 범위, 고객 요청, 예상 작업일, 제안 금액, 달라질 조건. 모두 채울 필요는 없습니다. 글 속 금액을 자동으로 수주·지출에 반영하지 않습니다.</p></div>
+        <details{% if e %} open{% endif %}><summary>견적 금액·세부 내역 따로 적기 (선택)</summary>
         <div class="field field--full"><label for="result-plan">내가 짠 작업 계획·인원</label><textarea id="result-plan" name="work_plan" rows="10" maxlength="20000" placeholder="1일차(기공2·조공2): 주방 가벽과 바닥 철거&#10;2일차(기공2·조공2): 주방 바닥 철거 이어서…">{{ v.get('work_plan','') }}</textarea></div>
         <div class="field-grid estimate-input-grid">
           <div class="field"><label for="result-labor">인건비 합계</label><input id="result-labor" name="labor_cost_krw" inputmode="numeric" value="{{ v.get('labor_cost_krw') or '' }}" placeholder="예: 3650000">{{ field_error(e, 'labor_cost_krw') }}</div>
@@ -86,7 +87,8 @@
           <div class="field field--full"><label for="result-total">고객 견적 합계</label><input id="result-total" name="total_quote_krw" inputmode="numeric" value="{{ v.get('total_quote_krw') or '' }}" placeholder="예: 13300000">{{ field_error(e, 'total_quote_krw') }}<p class="field-help">모르면 비워 두세요. 0원으로 처리하지 않습니다.</p></div>
           <div class="field field--full"><label for="result-conditions">조건·변동 가능성·서비스</label><textarea id="result-conditions" name="conditions_text" rows="6" maxlength="10000" placeholder="필름 미제거 시 50만원 감소&#10;금색칠까지 벗겨질 경우 재시공 추가비용&#10;외부 창고 철거·폐기 서비스">{{ v.get('conditions_text','') }}</textarea></div>
         </div>
-        <div class="form-actions"><p>방문 일정에는 넣지 않고, 방문 결과에만 저장합니다.</p><button class="button button--primary" type="submit">견적 결과 저장</button></div>
+        </details>
+        <div class="form-actions"><p>연결된 현장에서도 볼 수 있습니다. 기존 세부 내역은 그대로 보존합니다.</p><button class="button button--primary" type="submit">방문 내용 저장</button></div>
       </form>
     </details>
   </section>
