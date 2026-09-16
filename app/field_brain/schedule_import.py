@@ -394,13 +394,16 @@ def import_schedule_candidates(
                 approved += 1
                 promoted += 1
             skipped += 1
+            if candidate.trusted_fixed_visit:
+                duplicate_row['site_id'] = repo.connect_imported_visit_site(workspace_id, str(duplicate_row['id']))
             continue
         site_id = None
         if candidate.schedule_type == "work":
-            site = next(
-                (row for row in existing_sites if row.get("address_text") == candidate.address or row.get("name") == candidate.title),
-                None,
-            )
+            matches = [row for row in existing_sites
+                       if row.get('address_text') == candidate.address and row.get('name') == candidate.title
+                       and row.get('scope_summary') == candidate.summary
+                       and row.get('business_status') not in ('completed', 'settled', 'cancelled')]
+            site = matches[0] if len(matches) == 1 else None
             if site is None:
                 site = repo.create_site(
                     workspace_id, candidate.title, address_text=candidate.address,
@@ -428,6 +431,9 @@ def import_schedule_candidates(
             actor_type="user" if auto_approved else "ai",
         )
         existing_schedules.append(row)
+        if candidate.trusted_fixed_visit:
+            row['site_id'] = repo.connect_imported_visit_site(workspace_id, str(row['id']))
+            existing_sites = repo.list_sites(workspace_id)
         created += 1
         if auto_approved:
             approved += 1

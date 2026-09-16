@@ -87,6 +87,28 @@ class ScheduleTests(unittest.TestCase):
         visit_text = text.replace('<공사 일정 픽스입니다>', '<방문 일정 픽스입니다>').replace('철거 일정 :', '방문 일정 :')
         self.assertIsNone(extract_kakao_schedule_candidates(visit_text)[0].contractor_amount_text)
 
+    def test_imported_visit_links_site_then_agreement_without_reentry(self) -> None:
+        text = '2099년 9월 2일 오전 10:08, 김송호과장님 : <방문 일정 픽스입니다>\n주소 : 가상시 연결로 12\n내용 : 가벽 철거\n방문 일정 : 9월 10일 오전 11시'
+        folder = Path(self.temp.name) / 'originals'
+        import_schedule_candidates(self.repo, self.workspace['id'], folder, text, '')
+        visit = self.repo.list_schedule_items(self.workspace['id'])[0]
+        self.assertIsNotNone(visit['site_id'])
+        site = self.repo.get_site(visit['site_id'])
+        self.assertEqual(site['business_status'], 'estimating')
+        self.assertEqual(self.repo.list_for_site(site['id'], 'money_item'), [])
+        import_schedule_candidates(self.repo, self.workspace['id'], folder, text, '')
+        self.assertEqual(len(self.repo.list_sites(self.workspace['id'])), 2)
+        result = self.repo.apply_visit_agreement(self.workspace['id'], visit['id'], '480만원 메이드')
+        self.assertEqual(result, site['id'])
+
+    def test_same_address_different_scope_does_not_merge_visit(self) -> None:
+        site = self.repo.create_site(self.workspace['id'], '가상상가', address_text='가상시 12', scope_summary='간판 철거')
+        visit = self.repo.create_schedule_item(self.workspace['id'], 'estimate_visit', '가상상가',
+            '2099-09-10', '가벽 철거', address_text='가상시 12')
+        linked = self.repo.connect_imported_visit_site(self.workspace['id'], visit['id'])
+        self.assertNotEqual(linked, site['id'])
+        self.assertEqual(self.repo.connect_imported_visit_site(self.workspace['id'], visit['id']), linked)
+
     def test_work_and_estimate_visit_can_overlap(self) -> None:
         work = self.repo.create_schedule_item(
             self.workspace["id"], "work", "월곶 현장", "2026-09-03T08:00+09:00",

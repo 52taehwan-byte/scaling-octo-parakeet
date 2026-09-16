@@ -613,6 +613,45 @@ class FieldBrainRepository:
                         before=_snapshot(before), after=_snapshot(self._require_row(connection, 'schedule_items', schedule_id)),
                         reason=f'공사 픽스 원문의 업체금액 추가. 지출·수주 원장에는 반영하지 않음. source:{source_id or "manual"}')
 
+    def connect_imported_visit_site(self, workspace_id: str, schedule_id: str) -> str | None:
+        """Connect an approved visit without conflating same-address projects."""
+        with transaction(self.db_path) as connection:
+            before = self._require_row(connection, 'schedule_items', schedule_id, workspace_id=workspace_id)
+            if before['site_id']:
+                return before['site_id']
+            if before['schedule_type'] != 'estimate_visit' or before['review_status'] != 'approved' or before['business_status'] == 'cancelled':
+                return None
+            if not before['address_text']:
+                return None
+            matches = connection.execute(
+                """SELECT * FROM sites WHERE workspace_id=? AND name=? AND address_text=?
+                AND scope_summary=? AND deleted_at IS NULL AND business_status NOT IN ('completed','settled','cancelled')
+                AND legacy_status NOT IN ('reference_only','excluded','superseded')""",
+                (workspace_id, before['title'], before['address_text'], before['summary']),
+            ).fetchall()
+            now = _utc_now()
+            if len(matches) == 1:
+                site_id = matches[0]['id']
+            else:
+                site_id = _new_id()
+                connection.execute(
+                    """INSERT INTO sites (id,workspace_id,name,address_text,business_status,scope_summary,
+                    notes,created_at,updated_at,created_by) VALUES (?,?,?,?,'estimating',?,?,?,?,?)""",
+                    (site_id, workspace_id, before['title'], before['address_text'], before['summary'],
+                     '확정된 카카오톡 방문에서 연결한 현장. 수주 확정을 뜻하지 않습니다.', now, now, 'system'),
+                )
+                self._audit(connection, workspace_id=workspace_id, action_type='create', target_type='site',
+                            target_id=site_id, actor_type='system', actor_id=None, before=None,
+                            after=_snapshot(self._require_row(connection, 'sites', site_id)),
+                            reason=f'방문 일정에서 현장 연결: {schedule_id}')
+            connection.execute('UPDATE schedule_items SET site_id=?,updated_at=?,revision=revision+1 WHERE id=?',
+                               (site_id, now, schedule_id))
+            self._audit(connection, workspace_id=workspace_id, action_type='update', target_type='schedule_item',
+                        target_id=schedule_id, actor_type='system', actor_id=None, before=_snapshot(before),
+                        after=_snapshot(self._require_row(connection, 'schedule_items', schedule_id)),
+                        reason='방문·견적·수주가 같은 현장을 사용하도록 연결. 주소만으로 병합하지 않음.')
+            return site_id
+
     def get_schedule_item(self, schedule_id: str) -> dict[str, Any]:
         with closing(connect(self.db_path)) as connection:
             return dict(self._require_row(connection, "schedule_items", schedule_id))
