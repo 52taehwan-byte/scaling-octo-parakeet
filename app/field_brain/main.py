@@ -859,21 +859,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         markdown_file = form.get("markdown_file")
         error: str | None = None
         kakao_text = markdown_text = ""
-        if not isinstance(kakao_file, UploadFile) or not isinstance(markdown_file, UploadFile):
-            error = "카카오톡 TXT와 업무 정리 Markdown 파일을 모두 선택해 주세요."
+        kakao_present = isinstance(kakao_file, UploadFile) and bool(kakao_file.filename)
+        markdown_present = isinstance(markdown_file, UploadFile) and bool(markdown_file.filename)
+        if not kakao_present and not markdown_present:
+            error = "카카오톡 TXT 또는 Markdown 파일을 하나 이상 선택해 주세요."
         else:
             try:
-                kakao_bytes = await kakao_file.read()
-                markdown_bytes = await markdown_file.read()
+                kakao_bytes = await kakao_file.read(2_000_001) if kakao_present else b''
+                markdown_bytes = await markdown_file.read(2_000_001) if markdown_present else b''
             finally:
-                await kakao_file.close()
-                await markdown_file.close()
+                if isinstance(kakao_file, UploadFile):
+                    await kakao_file.close()
+                if isinstance(markdown_file, UploadFile):
+                    await markdown_file.close()
             if len(kakao_bytes) > 2_000_000 or len(markdown_bytes) > 2_000_000:
                 error = "각 파일은 2MB 이하여야 합니다."
             else:
                 try:
                     kakao_text = kakao_bytes.decode("utf-8-sig")
                     markdown_text = markdown_bytes.decode("utf-8-sig")
+                    if not kakao_text.strip() and not markdown_text.strip():
+                        error = "선택한 파일에 내용이 없습니다. 대화나 일정이 들어 있는 자료를 선택해 주세요."
                 except UnicodeDecodeError:
                     error = "UTF-8로 저장된 TXT와 Markdown 파일만 가져올 수 있습니다."
         result = None
@@ -882,8 +888,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 result = import_schedule_candidates(
                     repo, workspace_id, current_settings.originals_dir,
                     kakao_text, markdown_text,
-                    kakao_name=kakao_file.filename or "KakaoTalkChats.txt",
-                    markdown_name=markdown_file.filename or "Field-Brain.md",
+                    kakao_name=kakao_file.filename if kakao_present else "KakaoTalkChats.txt",
+                    markdown_name=markdown_file.filename if markdown_present else "Field-Brain.md",
                 )
             except (FieldBrainError, OSError, ValueError) as exc:
                 error = "자료를 안전하게 가져오지 못했습니다. 원본 형식과 저장 공간을 확인해 주세요."

@@ -6,7 +6,7 @@ conversation remains in the immutable source for a later model-assisted pass.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone, timedelta
 import hashlib
 from pathlib import Path
@@ -51,10 +51,11 @@ class ImportResult:
     source_id: str
     approved: int = 0
     ignored_past: int = 0
+    promoted: int = 0
 
     @property
     def pending(self) -> int:
-        return self.created - self.approved
+        return self.created - self.approved + self.promoted
 
 
 def _redact(text: str) -> str:
@@ -307,6 +308,26 @@ def _source_for_text(
         raise
 
 
+def extract_markdown_schedule_candidates(text: str) -> list[ScheduleCandidate]:
+    """Recognize dated field blocks only; never invent sender trust for a document."""
+    results = []
+    for block in re.split(r'(?m)^\s*(?:#{1,6}\s+.*|---+)\s*$', text):
+        # No implicit current year for old documents or relative dates.
+        if not re.search(r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일', block):
+            continue
+        normalized = block.replace('**', '')
+        if len(re.findall(r'(?m)^\s*[-●■]*\s*주소\s*[:：]', normalized)) != 1:
+            continue  # Never merge multiple sites inside an unstructured section.
+        try:
+            candidates = extract_kakao_schedule_candidates(normalized)
+        except ValueError:
+            continue
+        for candidate in candidates:
+            results.append(replace(candidate, source_comparison='markdown_only',
+                                   trusted_fixed_visit=False, trusted_fixed_work=False))
+    return results
+
+
 def import_schedule_candidates(
     repo: FieldBrainRepository,
     workspace_id: str,
@@ -318,21 +339,29 @@ def import_schedule_candidates(
     markdown_name: str = "Field-Brain.md",
     not_before: date | None = None,
 ) -> ImportResult:
-    kakao_source = _source_for_text(repo, workspace_id, originals_dir, kakao_text, kakao_name, "message_export")
+    if not kakao_text.strip() and not markdown_text.strip():
+        raise ValueError('일정 자료가 비어 있습니다.')
+    kakao_source = None
+    markdown_source = None
+    sourced_candidates = []
+    if kakao_text.strip():
+        kakao_source = _source_for_text(repo, workspace_id, originals_dir, kakao_text, kakao_name, "message_export")
+        sourced_candidates.extend((candidate, kakao_source) for candidate in extract_kakao_schedule_candidates(kakao_text, markdown_text))
     if markdown_text.strip():
-        _source_for_text(repo, workspace_id, originals_dir, markdown_text, markdown_name, "document")
-    all_candidates = extract_kakao_schedule_candidates(kakao_text, markdown_text)
+        markdown_source = _source_for_text(repo, workspace_id, originals_dir, markdown_text, markdown_name, "document")
+        sourced_candidates.extend((candidate, markdown_source) for candidate in extract_markdown_schedule_candidates(markdown_text))
+    all_candidates = [candidate for candidate, _ in sourced_candidates]
     threshold = not_before or datetime.now(SEOUL).date()
     candidates = [
-        row for row in all_candidates
+        (row, source) for row, source in sourced_candidates
         if row.trusted_fixed_visit or row.trusted_fixed_work
         or datetime.fromisoformat(row.start_at).date() >= threshold
     ]
     ignored_past = len(all_candidates) - len(candidates)
     existing_sites = repo.list_sites(workspace_id)
     existing_schedules = repo.list_schedule_items(workspace_id)
-    created = skipped = approved = 0
-    for candidate in candidates:
+    created = skipped = approved = promoted = 0
+    for candidate, candidate_source in candidates:
         duplicate_row = next(
             (row for row in existing_schedules if _same_schedule_identity(row, candidate)), None
         )
@@ -353,6 +382,7 @@ def import_schedule_candidates(
                 )
                 duplicate_row["review_status"] = "approved"
                 approved += 1
+                promoted += 1
             skipped += 1
             continue
         site_id = None
@@ -371,7 +401,7 @@ def import_schedule_candidates(
                 existing_sites.append(site)
             site_id = str(site["id"])
         evidence = repo.create_evidence(
-            kakao_source["id"], "whole_source", excerpt=candidate.excerpt, actor_type="user"
+            candidate_source["id"], "whole_source", excerpt=candidate.excerpt, actor_type="user"
         )
         auto_approved = candidate.trusted_fixed_visit or candidate.trusted_fixed_work
         row = repo.create_schedule_item(
@@ -391,5 +421,5 @@ def import_schedule_candidates(
         if auto_approved:
             approved += 1
     return ImportResult(
-        created, skipped, len(all_candidates), str(kakao_source["id"]), approved, ignored_past
+        created, skipped, len(all_candidates), str((kakao_source or markdown_source)["id"]), approved, ignored_past, promoted
     )

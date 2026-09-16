@@ -162,11 +162,29 @@ class WebSmokeTestCase(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertNotIn("파일을 모두 선택".encode("utf-8"), body)
         decoded = body.decode("utf-8")
-        self.assertIn("자료 대조 완료", decoded)
+        self.assertIn("자료 처리 완료", decoded)
         self.assertIn("바로 등록됨", decoded)
         self.assertIn("정보가 부족한 일정", decoded)
         self.assertIn("작업 일정 보기", decoded)
         self.assertIn("방문 일정 보기", decoded)
+
+    def test_schedule_import_single_files_and_input_errors(self) -> None:
+        examples = {
+            'kakao_file': ('chat.txt', '2099년 9월 2일 오전 10:08, 김송호과장님 : <방문 일정 픽스입니다>\n주소 : 가상시 테스트로 15\n내용 : 가벽 철거\n방문 일정 : 9월 24일 오후 2시'),
+            'markdown_file': ('note.md', '# 현장\n주소 : 가상시 별도로 20\n내용 : 간판 철거\n방문 일정 : 2099년 9월 25일 오전 11시'),
+        }
+        for field, (name, text) in examples.items():
+            with self.subTest(field=field):
+                status, body = asyncio.run(asgi_multipart_request(self.app, '/schedule-import',
+                    fields={'csrf_token': self.csrf()}, files={field: (name, text.encode('utf-8'))}))
+                self.assertEqual(status, 200)
+                self.assertIn('일정 1건'.encode('utf-8'), body)
+        self.assertEqual(len(self.app.state.repo.list_sources(self.app.state.workspace_id)), 2)
+        for files in ({}, {'kakao_file': ('empty.txt', b'  ')}, {'markdown_file': ('bad.md', b'\xff')},
+                      {'kakao_file': ('large.txt', b'a' * 2_000_001)}):
+            status, _ = asyncio.run(asgi_multipart_request(self.app, '/schedule-import',
+                fields={'csrf_token': self.csrf()}, files=files))
+            self.assertEqual(status, 422)
 
     def test_dashboard_is_local_secure_and_fictional(self) -> None:
         status, headers, body = self.request("/")

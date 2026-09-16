@@ -46,6 +46,30 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(rows[0]['total_quote_krw'], 4_800_000)
         self.assertEqual(rows[0]['revision'], 2)
 
+    def test_markdown_only_keeps_document_provenance_and_deduplicates(self) -> None:
+        text = '# 가상 현장\n주소 : 가상시 독립로 17\n내용 : 가벽 철거\n방문 일정 : 2099년 9월 25일 오전 11시'
+        folder = Path(self.temp.name) / 'originals'
+        first = import_schedule_candidates(self.repo, self.workspace['id'], folder, '', text)
+        second = import_schedule_candidates(self.repo, self.workspace['id'], folder, '', text)
+        self.assertEqual(first.created, 1)
+        self.assertEqual(first.approved, 0)
+        self.assertEqual(second.skipped, 1)
+        sources = self.repo.list_sources(self.workspace['id'])
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0]['source_type'], 'document')
+        schedule = self.repo.list_schedule_items(self.workspace['id'])[0]
+        self.assertEqual(schedule['source_comparison'], 'markdown_only')
+        with closing(connect(self.db_path)) as connection:
+            evidence = connection.execute('SELECT source_id FROM evidence WHERE id=?',
+                (schedule['evidence_ref'].split(':', 1)[1],)).fetchone()
+            self.assertEqual(evidence['source_id'], sources[0]['id'])
+
+    def test_markdown_does_not_invent_year_or_merge_sites(self) -> None:
+        from field_brain.schedule_import import extract_markdown_schedule_candidates
+        for text in ('주소: 가상시\n내용: 철거\n방문 일정: 9월 25일 오전 11시',
+                     '주소: 가상시 A\n내용: 철거\n방문 일정: 2099년 9월 25일\n주소: 가상시 B\n내용: 철거\n방문 일정: 2099년 9월 26일'):
+            self.assertEqual(extract_markdown_schedule_candidates(text), [])
+
     def test_work_and_estimate_visit_can_overlap(self) -> None:
         work = self.repo.create_schedule_item(
             self.workspace["id"], "work", "월곶 현장", "2026-09-03T08:00+09:00",
