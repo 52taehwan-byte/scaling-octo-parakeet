@@ -758,6 +758,96 @@ class FieldBrainRepository:
             )
             return dict(after)
 
+    def apply_visit_agreement(self, workspace_id: str, visit_id: str, note: str) -> str:
+        """Apply a user-declared agreement atomically; preserve proposal and revisions."""
+        from .agreements import parse_agreement
+        from .analytics import current_money_rows
+
+        note = _text(note, 'note', required=True, max_length=2000)
+        amount, start = parse_agreement(note)
+        with transaction(self.db_path) as connection:
+            visit = self._require_row(connection, 'schedule_items', visit_id, workspace_id=workspace_id)
+            if visit['schedule_type'] != 'estimate_visit' or visit['business_status'] == 'cancelled':
+                raise ValidationError('취소되지 않은 견적 방문에서 수주 소식을 남겨 주세요.')
+            if not visit['site_id']:
+                raise ValidationError('이 방문은 아직 현장에 연결되지 않았습니다. 현장 연결 후 수주를 반영할 수 있습니다.')
+            site = self._require_row(connection, 'sites', visit['site_id'], workspace_id=workspace_id)
+            evidence = f'visit-agreement:{visit_id}'
+            # Replaying an older saved message must not undo a later correction.
+            if connection.execute(
+                "SELECT 1 FROM money_items WHERE site_id=? AND evidence_ref=? AND notes=? AND deleted_at IS NULL UNION ALL SELECT 1 FROM schedule_items WHERE site_id=? AND evidence_ref=? AND notes=? AND deleted_at IS NULL LIMIT 1",
+                (site['id'], evidence, note, site['id'], evidence, note),
+            ).fetchone():
+                return site['id']
+            if site['business_status'] in ('completed', 'settled', 'cancelled'):
+                raise ValidationError('종료된 현장입니다. 기존 상태를 확인한 후 변경해 주세요.')
+            rows = [dict(r) for r in connection.execute(
+                "SELECT * FROM money_items WHERE site_id=? AND deleted_at IS NULL AND legacy_status NOT IN ('reference_only','excluded','superseded')", (site['id'],)
+            ).fetchall()]
+            heads, effective = current_money_rows(rows)
+            bases = [r for r in effective if r['purpose'] == 'base_quote' and r['progression'] != 'void']
+            if len(bases) > 1 or any(r['purpose'] == 'base_quote' and r['review_status'] in ('pending', 'held') for r in heads):
+                raise ValidationError('기존 견적이 여러 건이거나 변경 중입니다. 어느 견적의 최종 합의인지 먼저 구분해야 합니다.')
+            previous = bases[0] if bases else None
+            if previous and previous['chain_head_id'] != previous['id']:
+                raise ValidationError('기존 견적에 정정 이력이 있습니다. 현재 적용할 견적을 먼저 구분해 주세요.')
+            schedules = connection.execute(
+                "SELECT * FROM schedule_items WHERE site_id=? AND schedule_type='work' AND deleted_at IS NULL AND business_status!='cancelled'",
+                (site['id'],),
+            ).fetchall()
+            linked = next((r for r in schedules if r['evidence_ref'] == evidence), None)
+            if start and schedules and not linked:
+                same = [r for r in schedules if r['start_at'] == start and r['business_status'] == 'scheduled' and r['review_status'] == 'approved']
+                if len(same) != 1:
+                    raise ValidationError('이미 작업 일정이 있습니다. 수주금액만 남기고 날짜 변경은 기존 작업 일정에서 해 주세요.')
+                linked = same[0]
+            if start and linked and linked['start_at'] != start:
+                raise ValidationError('작업 일정이 이미 연결되었습니다. 날짜 변경은 기존 작업 일정에서 해 주세요.')
+            now = _utc_now()
+            if not previous or previous['amount_krw'] != amount or previous['progression'] not in ('agreed', 'claimed', 'confirmed', 'settled'):
+                target = _new_id()
+                connection.execute(
+                    """INSERT INTO money_items
+                    (id,workspace_id,site_id,lineage_key,title,amount_krw,purpose,progression,
+                     actualness,direction,epistemic_type,review_status,supersedes_money_item_id,
+                     notes,evidence_ref,created_at,updated_at,created_by)
+                    VALUES (?,?,?,?,?,?,'base_quote','agreed','estimated','inflow','decision','approved',?,?,?,?,?,?)""",
+                    (target, workspace_id, site['id'], previous['lineage_key'] if previous else f'site-agreement:{site["id"]}',
+                     '최종 수주금액', amount, previous['id'] if previous else None, note, evidence, now, now, 'user'),
+                )
+                self._audit(connection, workspace_id=workspace_id, action_type='supersede' if previous else 'create',
+                            target_type='money_item', target_id=target, actor_type='user', actor_id=None,
+                            before=previous, after=_snapshot(self._require_row(connection, 'money_items', target)), reason=note)
+            if start and not linked:
+                result = connection.execute('SELECT * FROM estimate_visit_results WHERE schedule_id=?', (visit_id,)).fetchone()
+                summary = (result['customer_requests'] if result else visit['summary'])[:3000]
+                target = _new_id()
+                connection.execute(
+                    """INSERT INTO schedule_items
+                    (id,workspace_id,site_id,schedule_type,title,start_at,summary,customer_name,
+                     customer_contact,address_text,notes,evidence_ref,created_at,updated_at,created_by)
+                    VALUES (?,?,?,'work',?,?,?,?,?,?,?,?,?,?,'user')""",
+                    (target, workspace_id, site['id'], site['name'], start, summary,
+                     visit['customer_name'], visit['customer_contact'], visit['address_text'] or site['address_text'],
+                     note, evidence, now, now),
+                )
+                self._audit(connection, workspace_id=workspace_id, action_type='create', target_type='schedule_item',
+                            target_id=target, actor_type='user', actor_id=None, before=None,
+                            after=_snapshot(self._require_row(connection, 'schedule_items', target)), reason=note)
+            # An agreement does not rewind a site that is already being worked on.
+            status = 'scheduled' if site['business_status'] in ('lead', 'estimating') else site['business_status']
+            planned = site['planned_start_at'] or start
+            industry = json.loads(site['industry_data_json'] or '{}')
+            if status == 'scheduled':
+                industry['ui_stage'] = 'scheduled'
+            if status != site['business_status'] or planned != site['planned_start_at'] or industry != json.loads(site['industry_data_json'] or '{}'):
+                connection.execute('UPDATE sites SET business_status=?,planned_start_at=?,industry_data_json=?,updated_at=?,revision=revision+1 WHERE id=?',
+                                   (status, planned, json.dumps(industry, ensure_ascii=False), now, site['id']))
+                self._audit(connection, workspace_id=workspace_id, action_type='update', target_type='site',
+                            target_id=site['id'], actor_type='user', actor_id=None, before=_snapshot(site),
+                            after=_snapshot(self._require_row(connection, 'sites', site['id'])), reason=note)
+            return site['id']
+
     def list_site_visit_results(self, site_id: str) -> list[dict[str, Any]]:
         """Read linked outcomes without copying proposals into the money ledger."""
         with closing(connect(self.db_path)) as connection:

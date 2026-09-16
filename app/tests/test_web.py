@@ -522,6 +522,28 @@ class WebSmokeTestCase(unittest.TestCase):
         saved = self.app.state.repo.get_estimate_visit_result(visit["id"])
         self.assertEqual(saved["total_quote_krw"], 13_300_000)
 
+    def test_visit_agreement_posts_atomically_and_preserves_invalid_text(self) -> None:
+        repo = self.app.state.repo
+        site = repo.create_site(self.app.state.workspace_id, '가상 수주 현장')
+        visit = repo.create_schedule_item(self.app.state.workspace_id, 'estimate_visit', '가상 수주 현장',
+            '2099-09-12T11:00+09:00', '가벽 철거', site_id=site['id'])
+        path = f"/schedules/{visit['id']}/agreement"
+        status, _, body = self.request(path, method='POST',
+            form={'csrf_token': self.csrf(), 'agreement_note': '480만원 메이드 예정'})
+        self.assertEqual(status, 422)
+        self.assertIn('480만원 메이드 예정', body.decode('utf-8'))
+        self.assertEqual(repo.list_for_site(site['id'], 'money_item'), [])
+        status, headers, _ = self.request(path, method='POST',
+            form={'csrf_token': self.csrf(), 'agreement_note': '480만원 메이드. 2099-09-20 08:00 작업 시작'})
+        self.assertEqual(status, 303)
+        self.assertIn(f"/sites/{site['id']}", headers['location'])
+        status, _, body = self.request(headers['location'])
+        self.assertEqual(status, 200)
+        self.assertIn('4,800,000원', body.decode('utf-8'))
+        self.assertEqual(len([row for row in repo.list_schedule_items(self.app.state.workspace_id, schedule_type='work') if row['site_id'] == site['id']]), 1)
+        status, _, _ = self.request(path, method='POST', form={'agreement_note': '480만원 메이드'})
+        self.assertEqual(status, 403)
+
     def test_free_visit_note_is_visible_on_linked_site(self) -> None:
         repo = self.app.state.repo
         workspace = self.app.state.workspace_id

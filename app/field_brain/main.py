@@ -52,6 +52,7 @@ NOTICE_MESSAGES = {
     "person_created": "사람과 현장 역할을 저장했습니다.",
     "task_created": "할 일을 저장했습니다.",
     "money_created": "돈 기록을 저장했습니다.",
+    "agreement_applied": "수주 소식을 처리했습니다. 같은 소식은 중복 반영하지 않습니다. 현재 수주금액과 작업 일정은 아래에서 볼 수 있습니다.",
     "risk_created": "위험요소를 저장했습니다.",
     "event_created": "타임라인 기록을 저장했습니다.",
     "capture_created": "원문을 보존하고 이 현장 기록에 정리했습니다. 틀린 내용만 고쳐 주세요.",
@@ -1160,6 +1161,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=422, detail="일정 상태를 바꾼 이유를 입력해 주세요.") from exc
         notice = "schedule_cancelled" if cancelled else "schedule_restored"
         return RedirectResponse(f"/schedules/{schedule_id}?notice={notice}", status_code=303)
+
+    @app.post("/schedules/{schedule_id}/agreement", response_class=HTMLResponse)
+    async def visit_agreement(request: Request, schedule_id: str) -> HTMLResponse:
+        try:
+            item = repo.get_schedule_item(schedule_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail='견적 방문을 찾을 수 없습니다.') from exc
+        if item.get('workspace_id') != workspace_id or item.get('schedule_type') != 'estimate_visit':
+            raise HTTPException(status_code=404, detail='견적 방문을 찾을 수 없습니다.')
+        values = await _form_dict(request)
+        _validate_csrf(request, values)
+        try:
+            site_id = repo.apply_visit_agreement(workspace_id, schedule_id, values.get('agreement_note', ''))
+        except (ValueError, FieldBrainError) as exc:
+            context = _common_context(request, active_page='estimate_visits')
+            context.update({
+                'schedule': present_schedule_rows([item], repo.list_sites(workspace_id))[0],
+                'estimate_result': repo.get_estimate_visit_result(schedule_id),
+                'estimate_form_values': {}, 'estimate_form_errors': {},
+                'agreement_note': values.get('agreement_note', ''), 'agreement_error': str(exc),
+            })
+            return _render(request, 'schedule_detail.html', context, status_code=422)
+        return RedirectResponse(f'/sites/{site_id}?notice=agreement_applied', status_code=303)
 
     @app.post("/schedules/{schedule_id}/estimate-result", response_class=HTMLResponse)
     async def estimate_visit_result_save(request: Request, schedule_id: str) -> HTMLResponse:

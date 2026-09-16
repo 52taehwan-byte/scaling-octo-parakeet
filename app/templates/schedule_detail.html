@@ -49,6 +49,20 @@
 </section>
 {% endif %}
 {% if schedule.type_class == 'visit' %}
+  {% if schedule.site_id and schedule.business_status != 'cancelled' %}
+  <section class="panel" id="agreement">
+    <h2>수주 소식</h2>
+    <p>이 현장이 메이드되면 최종 합의 내용을 남기세요. 제안 견적은 그대로 두고 수주금액과 작업 일정에 연결합니다.</p>
+    <form action="/schedules/{{ schedule.id }}/agreement" method="post">
+      {{ csrf(csrf_token) }}
+      <div class="field"><label for="agreement-note">최종 금액과 작업 시작</label>
+      <textarea id="agreement-note" name="agreement_note" rows="3" required maxlength="2000" placeholder="480만원에 메이드. 2026-09-20 08:00 작업 시작"{% if agreement_error %} aria-describedby="agreement-error" aria-invalid="true"{% endif %}>{{ agreement_note or '' }}</textarea>
+      <p class="field-help">작업일 미정이면 “480만원에 메이드”까지만 적으세요. 현재는 위 형식의 확정된 소식만 처리합니다. 추가 공사금액이 아닌 현장 전체의 최종 합의금액입니다.</p>
+      {% if agreement_error %}<p id="agreement-error" role="alert">{{ agreement_error }}</p>{% endif %}</div>
+      <button class="button button--primary" type="submit">수주 소식 반영</button>
+    </form>
+  </section>
+  {% endif %}
   {% set saved = estimate_result or {} %}
   {% set v = estimate_form_values if estimate_form_values else saved %}
   {% set e = estimate_form_errors or {} %}
