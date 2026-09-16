@@ -41,6 +41,7 @@ class ScheduleCandidate:
     source_comparison: str
     trusted_fixed_visit: bool = False
     trusted_fixed_work: bool = False
+    contractor_amount_text: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,12 +248,19 @@ def extract_kakao_schedule_candidates(text: str, markdown_text: str = "") -> lis
             comparison = "matched" if markdown_match else "kakao_only"
             confidence = 0.97 if explicit and markdown_match else 0.93 if explicit else 0.82
             excerpt_lines = [f"주소: {address}", f"내용: {summary}", f"{'공사' if kind == 'work' else '방문'} 일정: {raw_date}"]
+            contractor_amount = fields.get('업체 실행비') or fields.get('실행비')
+            if kind != 'work' or not fixed_work_message:
+                contractor_amount = None
+            if contractor_amount:
+                contractor_amount = _redact(contractor_amount)
+                excerpt_lines.append(f'업체 실행비: {contractor_amount}')
             candidates.append(
                 ScheduleCandidate(
                     kind, title, start, end, precision, summary, address, contact,
                     _redact("\n".join(excerpt_lines)), confidence, comparison,
                     trusted_fixed_visit=(kind == "estimate_visit" and fixed_visit_message),
                     trusted_fixed_work=(kind == "work" and fixed_work_message),
+                    contractor_amount_text=contractor_amount,
                 )
             )
     return candidates
@@ -324,7 +332,7 @@ def extract_markdown_schedule_candidates(text: str) -> list[ScheduleCandidate]:
             continue
         for candidate in candidates:
             results.append(replace(candidate, source_comparison='markdown_only',
-                                   trusted_fixed_visit=False, trusted_fixed_work=False))
+                                   trusted_fixed_visit=False, trusted_fixed_work=False, contractor_amount_text=None))
     return results
 
 
@@ -366,6 +374,8 @@ def import_schedule_candidates(
             (row for row in existing_schedules if _same_schedule_identity(row, candidate)), None
         )
         if duplicate_row is not None:
+            if candidate.contractor_amount_text:
+                repo.append_schedule_amount_note(str(duplicate_row['id']), candidate.contractor_amount_text, source_id=str(candidate_source['id']))
             if candidate.contact and not duplicate_row.get("customer_contact"):
                 repo.enrich_schedule_contact(
                     str(duplicate_row["id"]), candidate.contact,
@@ -410,6 +420,7 @@ def import_schedule_candidates(
             time_precision=candidate.time_precision, customer_name=candidate.title if candidate.schedule_type == "estimate_visit" else None,
             customer_contact=candidate.contact if candidate.schedule_type == "estimate_visit" else None,
             address_text=candidate.address,
+            notes=f'공사 픽스 업체금액: {candidate.contractor_amount_text}' if candidate.contractor_amount_text else None,
             epistemic_type="decision" if auto_approved else "claim",
             review_status="approved" if auto_approved else "pending",
             evidence_ref=f"evidence:{evidence['id']}", confidence=candidate.confidence,

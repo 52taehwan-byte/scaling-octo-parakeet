@@ -16,7 +16,8 @@
     <div><dt>{% if schedule.type_class == 'work' %}작업 내용{% else %}요청받은 철거 내용{% endif %}</dt><dd>{{ schedule.summary }}</dd></div>
     {% if schedule.participants_text %}<div><dt>함께 일할 사람</dt><dd>{{ schedule.participants_text }}</dd></div>{% endif %}
     {% if schedule.customer_contact %}<div><dt>연락처</dt><dd>{{ schedule.customer_contact }}</dd></div>{% endif %}
-    {% if schedule.notes %}<div><dt>메모</dt><dd>{{ schedule.notes }}</dd></div>{% endif %}
+    {% if schedule.notes %}<div><dt>메모·카톡 금액</dt><dd style="white-space: pre-wrap">{{ schedule.notes }}</dd></div>
+    {% if '공사 픽스 업체금액:' in schedule.notes %}<div><dt>금액 기준</dt><dd>공사 픽스 원문에 적힌 업체금액입니다. 우리 팀의 실제 지출로 계산하지 않습니다. 부가세·평당 단가·미정 조건은 원문 그대로 보존하며, 여러 금액이 있으면 합산하거나 최종금액으로 단정하지 않습니다.</dd></div>{% endif %}{% endif %}
   </dl>
   <div class="schedule-detail__actions">
     {% if schedule.site_id %}<a class="button button--primary" href="/sites/{{ schedule.site_id }}">현장 자세히 보기</a>{% endif %}

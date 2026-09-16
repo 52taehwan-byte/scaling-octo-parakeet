@@ -592,6 +592,27 @@ class FieldBrainRepository:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def append_schedule_amount_note(self, schedule_id: str, amount_text: str, *, source_id: str | None = None) -> None:
+        """Preserve explicit contractor quote text; never post it as an expense."""
+        clean = _text(amount_text, 'amount_text', required=True, max_length=2000)
+        line = f'공사 픽스 업체금액: {clean}'
+        with transaction(self.db_path) as connection:
+            before = self._require_row(connection, 'schedule_items', schedule_id)
+            if source_id:
+                self._require_row(connection, 'sources', source_id, workspace_id=before['workspace_id'])
+            if before['schedule_type'] != 'work':
+                raise ValidationError('공사 일정에만 업체금액을 연결할 수 있습니다.')
+            lines = (before['notes'] or '').splitlines()
+            if line in lines:
+                return
+            notes = '\n'.join([*lines, line])
+            connection.execute('UPDATE schedule_items SET notes=?,updated_at=?,revision=revision+1 WHERE id=?',
+                               (notes, _utc_now(), schedule_id))
+            self._audit(connection, workspace_id=before['workspace_id'], action_type='update',
+                        target_type='schedule_item', target_id=schedule_id, actor_type='system', actor_id=None,
+                        before=_snapshot(before), after=_snapshot(self._require_row(connection, 'schedule_items', schedule_id)),
+                        reason=f'공사 픽스 원문의 업체금액 추가. 지출·수주 원장에는 반영하지 않음. source:{source_id or "manual"}')
+
     def get_schedule_item(self, schedule_id: str) -> dict[str, Any]:
         with closing(connect(self.db_path)) as connection:
             return dict(self._require_row(connection, "schedule_items", schedule_id))

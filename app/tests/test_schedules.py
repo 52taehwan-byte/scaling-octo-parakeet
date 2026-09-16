@@ -70,6 +70,23 @@ class ScheduleTests(unittest.TestCase):
                      '주소: 가상시 A\n내용: 철거\n방문 일정: 2099년 9월 25일\n주소: 가상시 B\n내용: 철거\n방문 일정: 2099년 9월 26일'):
             self.assertEqual(extract_markdown_schedule_candidates(text), [])
 
+    def test_fixed_work_amount_is_preserved_without_becoming_expense(self) -> None:
+        text = '2099년 9월 2일 오전 10:08, 김송호과장님 : <공사 일정 픽스입니다>\n주소 : 가상시 시험로 10\n내용 : 욕실 및 바닥 철거\n철거 일정 : 9월 10일\n업체 실행비 : 화장실 vat 별도 144만원 / 바닥 평당 25,200원 (최종 견적 미정)'
+        folder = Path(self.temp.name) / 'originals'
+        candidate = extract_kakao_schedule_candidates(text)[0]
+        self.assertIn('25,200원', candidate.contractor_amount_text)
+        self.assertIn('최종 견적 미정', candidate.excerpt)
+        without_amount = text.split('\n업체 실행비')[0]
+        import_schedule_candidates(self.repo, self.workspace['id'], folder, without_amount, '')
+        import_schedule_candidates(self.repo, self.workspace['id'], folder, text, '')
+        import_schedule_candidates(self.repo, self.workspace['id'], folder, text, '')
+        work = self.repo.list_schedule_items(self.workspace['id'])[0]
+        self.assertEqual(work['notes'].count('공사 픽스 업체금액:'), 1)
+        self.assertIn('144만원', work['notes'])
+        self.assertEqual(self.repo.list_for_site(work['site_id'], 'money_item'), [])
+        visit_text = text.replace('<공사 일정 픽스입니다>', '<방문 일정 픽스입니다>').replace('철거 일정 :', '방문 일정 :')
+        self.assertIsNone(extract_kakao_schedule_candidates(visit_text)[0].contractor_amount_text)
+
     def test_work_and_estimate_visit_can_overlap(self) -> None:
         work = self.repo.create_schedule_item(
             self.workspace["id"], "work", "월곶 현장", "2026-09-03T08:00+09:00",
