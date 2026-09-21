@@ -23,6 +23,26 @@
         <a class="button button--secondary" href="/estimate-visits">방문 일정 보기</a>
       </div>
     </section>
+    {% if import_schedules %}
+    <section class="panel" aria-labelledby="import-schedules-heading">
+      <h2 id="import-schedules-heading">이번 자료에 연결된 일정</h2>
+      <p>새 일정과 이미 있던 일정을 함께 보여드립니다. 지난 날짜도 여기서 바로 열 수 있습니다. 표시된 상태는 앱에 저장된 현재 상태이며, 이후 대화의 변경·취소까지 모두 해석한 결과는 아닙니다.</p>
+      {% for kind, heading in [('work', '작업 일정'), ('estimate_visit', '견적 방문')] %}
+      <h3>{{ heading }}</h3>
+      <ul class="check-list">
+      {% for item in import_schedules if item.schedule_type == kind %}
+        <li>
+          <strong><a href="{{ item.detail_url }}">{{ item.start_label }} · {{ item.title }}</a></strong>
+          <span>{{ item.summary }}</span>
+          <span>{{ item.status_label }}{% if item.review_status != 'approved' %} · 일정판 미반영{% endif %}{% if item.is_past %} · 지난 날짜{% endif %}</span>
+          {% for line in (item.notes or '').splitlines() if line.startswith('공사 픽스 업체금액:') %}<span>{{ line }} (실제 지출 아님)</span>{% endfor %}
+          {% if item.site_id %}<a href="/sites/{{ item.site_id }}">연결된 현장 보기</a>{% endif %}
+        </li>
+      {% else %}<li>이번 자료에서 연결된 {{ heading }}이 없습니다.</li>{% endfor %}
+      </ul>
+      {% endfor %}
+    </section>
+    {% endif %}
   {% endif %}
   <section class="form-layout import-layout">
     <form class="panel form-card" action="/schedule-import" method="post" enctype="multipart/form-data">

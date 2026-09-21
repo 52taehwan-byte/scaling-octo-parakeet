@@ -894,7 +894,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except (FieldBrainError, OSError, ValueError) as exc:
                 error = "자료를 안전하게 가져오지 못했습니다. 원본 형식과 저장 공간을 확인해 주세요."
         context = _common_context(request, active_page="records")
-        context.update({"import_result": result, "global_error": error})
+        context.update({"import_result": result, "global_error": error,
+                        "import_schedules": present_schedule_rows(result.schedule_items, repo.list_sites(workspace_id)) if result else []})
         if error:
             return _render(request, "schedule_import.html", context, status_code=422)
         return _render(request, "schedule_import.html", context)

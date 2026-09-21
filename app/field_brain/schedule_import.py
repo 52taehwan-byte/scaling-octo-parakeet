@@ -53,6 +53,7 @@ class ImportResult:
     approved: int = 0
     ignored_past: int = 0
     promoted: int = 0
+    schedule_items: tuple[dict[str, Any], ...] = ()
 
     @property
     def pending(self) -> int:
@@ -383,11 +384,13 @@ def import_schedule_candidates(
     existing_sites = repo.list_sites(workspace_id)
     existing_schedules = repo.list_schedule_items(workspace_id)
     created = skipped = approved = promoted = 0
+    result_ids: dict[str, None] = {}
     for candidate, candidate_source in candidates:
         duplicate_row = next(
             (row for row in existing_schedules if _same_schedule_identity(row, candidate)), None
         )
         if duplicate_row is not None:
+            result_ids[str(duplicate_row['id'])] = None
             if candidate.contractor_amount_text:
                 repo.append_schedule_amount_note(str(duplicate_row['id']), candidate.contractor_amount_text, source_id=str(candidate_source['id']))
             if candidate.contact and not duplicate_row.get("customer_contact"):
@@ -445,6 +448,7 @@ def import_schedule_candidates(
             actor_type="user" if auto_approved else "ai",
         )
         existing_schedules.append(row)
+        result_ids[str(row['id'])] = None
         if candidate.trusted_fixed_visit:
             row['site_id'] = repo.connect_imported_visit_site(workspace_id, str(row['id']))
             existing_sites = repo.list_sites(workspace_id)
@@ -452,5 +456,7 @@ def import_schedule_candidates(
         if auto_approved:
             approved += 1
     return ImportResult(
-        created, skipped, len(all_candidates), str((kakao_source or markdown_source)["id"]), approved, ignored_past, promoted
+        created, skipped, len(all_candidates), str((kakao_source or markdown_source)["id"]), approved, ignored_past, promoted,
+        tuple(sorted((repo.get_schedule_item(item_id) for item_id in result_ids),
+                     key=lambda item: (item['start_at'], item['id'])))
     )

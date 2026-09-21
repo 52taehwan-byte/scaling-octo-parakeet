@@ -54,6 +54,9 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(first.created, 1)
         self.assertEqual(first.approved, 0)
         self.assertEqual(second.skipped, 1)
+        self.assertEqual(len(first.schedule_items), 1)
+        self.assertEqual(first.schedule_items, second.schedule_items)
+        self.assertEqual(first.schedule_items[0]['review_status'], 'pending')
         sources = self.repo.list_sources(self.workspace['id'])
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0]['source_type'], 'document')
@@ -203,6 +206,13 @@ class ScheduleTests(unittest.TestCase):
         )
         self.assertEqual(len(approved), 1)
         self.assertEqual(approved[0]["start_at"], "2026-08-24T14:00+09:00")
+        self.assertEqual(result.schedule_items[0]['site_id'], approved[0]['site_id'])
+        self.assertIsNotNone(result.schedule_items[0]['site_id'])
+        self.repo.set_schedule_cancelled(approved[0]['id'], cancelled=True, reason='고객 취소')
+        repeated = import_schedule_candidates(
+            self.repo, self.workspace['id'], Path(self.temp.name) / 'fixed-originals', text, '')
+        self.assertEqual(len(repeated.schedule_items), 1)
+        self.assertEqual(repeated.schedule_items[0]['business_status'], 'cancelled')
 
     def test_untrusted_fixed_phrase_still_requires_review(self) -> None:
         text = """2026년 9월 2일 오전 10:08, 다른사람 : <방문 일정 픽스입니다>

@@ -167,6 +167,17 @@ class WebSmokeTestCase(unittest.TestCase):
         self.assertIn("정보가 부족한 일정", decoded)
         self.assertIn("작업 일정 보기", decoded)
         self.assertIn("방문 일정 보기", decoded)
+        self.assertIn("이번 자료에 연결된 일정", decoded)
+        self.assertIn("120평 전체 철거 및 원상복구", decoded)
+        schedules = self.app.state.repo.list_schedule_items(self.app.state.workspace_id)
+        imported = next(row for row in schedules if row['summary'] == '120평 전체 철거 및 원상복구')
+        self.assertIn(f'/schedules/{imported["id"]}', decoded)
+        self.assertIn(f'/sites/{imported["site_id"]}', decoded)
+        status, repeated = asyncio.run(asgi_multipart_request(
+            self.app, '/schedule-import', fields={'csrf_token': self.csrf()},
+            files={'kakao_file': ('KakaoTalkChats.txt', kakao)}))
+        self.assertEqual(status, 200)
+        self.assertIn(f'/schedules/{imported["id"]}', repeated.decode('utf-8'))
 
     def test_schedule_import_single_files_and_input_errors(self) -> None:
         examples = {
