@@ -10,11 +10,12 @@
   {% set e = form_errors if form_errors is defined else {} %}
   <form class="panel daily-log-form" action="/daily-log" method="post" novalidate>
     {{ csrf(csrf_token if csrf_token is defined else "") }}
+    {% if v.get('site_id') %}<input type="hidden" name="site_id" value="{{ v.get('site_id') }}"><p>선택한 현장: <strong>{{ v.get('site_name') }}</strong> · 이 현장에 기록과 지출이 연결됩니다. <a href="/daily-log">다른 현장에 기록</a></p>{% endif %}
     {% if e %}<div class="form-error-summary" role="alert"><strong>확인할 내용이 있습니다.</strong><p>현장과 날짜, 오늘의 기록을 확인해 주세요.</p></div>{% endif %}
     <section class="form-section">
       <div class="form-section__heading"><span>1</span><div><p class="eyebrow">먼저 이것만</p><h2>어디에서 언제 일했나요?</h2></div></div>
       <div class="field-grid">
-        <div class="field{% if e.get('site_name') %} field--invalid{% endif %}"><label for="daily-site">현장 <span class="required">필수</span></label><input id="daily-site" name="site_name" list="daily-site-list" value="{{ v.get('site_name', '') }}" required maxlength="200" placeholder="예: 평택 리모델링 철거"><datalist id="daily-site-list">{% for site in sites %}<option value="{{ site.get('name') }}"></option>{% endfor %}</datalist>{{ field_error(e, "site_name") }}<p class="field-help">기존 현장을 선택하거나 새 현장 이름을 적으세요.</p></div>
+        <div class="field{% if e.get('site_name') %} field--invalid{% endif %}"><label for="daily-site">현장 <span class="required">필수</span></label><input id="daily-site" name="site_name" list="daily-site-list" value="{{ v.get('site_name', '') }}" {% if v.get('site_id') %}readonly{% endif %} required maxlength="200" placeholder="예: 평택 리모델링 철거"><datalist id="daily-site-list">{% for site in sites %}<option value="{{ site.get('name') }}"></option>{% endfor %}</datalist>{{ field_error(e, "site_name") }}<p class="field-help">{% if v.get('site_id') %}현장에서 이어 쓰는 기록입니다. 현장 이름은 다시 입력하지 않아도 됩니다.{% else %}기존 현장을 선택하거나 새 현장 이름을 적으세요. <a href="/sites">주소로 현장 찾기</a>{% endif %}</p></div>
         <div class="field{% if e.get('log_date') %} field--invalid{% endif %}"><label for="daily-date">작업 날짜 <span class="required">필수</span></label><input id="daily-date" type="date" name="log_date" value="{{ v.get('log_date', '') }}" required>{{ field_error(e, "log_date") }}</div>
       </div>
     </section>

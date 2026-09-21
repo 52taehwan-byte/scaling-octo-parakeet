@@ -9,7 +9,7 @@
 {% endblock %}
 {% block page_actions %}
   <a class="button button--secondary" href="/sites">현장 목록</a>
-  <a class="button button--primary" href="/daily-log">오늘 작업일지</a>
+  <a class="button button--primary" href="/daily-log?site_id={{ site.id }}">오늘 작업일지</a>
 {% endblock %}
 
 {% block content %}
@@ -84,7 +84,7 @@
       {% if open_tasks %}<ul class="site-now-list">{% for task in open_tasks[:3] %}<li><strong>{{ task.get('title') }}</strong><small>{{ task.get('due_date_label') or '날짜 미정' }}</small></li>{% endfor %}</ul>{% else %}<p class="site-now-empty">현재 등록된 남은 일이 없습니다.</p>{% endif %}
     </article>
     <article class="panel site-now-card">
-      <div class="panel__header"><div><p class="eyebrow">최근 기록</p><h2>무슨 일이 있었나</h2></div><a class="text-link" href="/daily-log">작업일지</a></div>
+      <div class="panel__header"><div><p class="eyebrow">최근 기록</p><h2>무슨 일이 있었나</h2></div><a class="text-link" href="/daily-log?site_id={{ site.id }}">작업일지</a></div>
       {% if recent_records %}<ul class="site-now-list">{% for event in recent_records %}<li><strong>{{ event.get('title') }}</strong><small>{{ event.get('occurred_at_label') or '시각 미확인' }}</small></li>{% endfor %}</ul>{% else %}<p class="site-now-empty">아직 연결된 작업 기록이 없습니다.</p>{% endif %}
     </article>
   </section>

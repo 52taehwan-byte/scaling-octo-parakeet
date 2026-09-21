@@ -487,6 +487,30 @@ class WebSmokeTestCase(unittest.TestCase):
         self.assertEqual(review_status, 200)
         self.assertIn("이 값을 찾은 문장", review_body.decode("utf-8"))
 
+    def test_daily_log_keeps_selected_site_even_with_duplicate_names(self) -> None:
+        repo, workspace = self.app.state.repo, self.app.state.workspace_id
+        first = repo.create_site(workspace, '동명 시험 현장', address_text='가상로 1')
+        second = repo.create_site(workspace, '동명 시험 현장', address_text='가상로 2')
+        status, _, body = self.request('/daily-log?site_id=' + second['id'])
+        self.assertEqual(status, 200)
+        self.assertIn(('value="' + second['id'] + '"').encode(), body)
+        form = {'csrf_token': self.csrf(), 'site_name': first['name'],
+                'log_date': '2026-09-21', 'entry_text': '가벽을 철거했다.'}
+        status, _, _ = self.request('/daily-log', method='POST', form=form)
+        self.assertEqual(status, 422)
+        self.assertEqual(repo.list_sources(workspace, site_id=first['id']), [])
+        form.update(site_id=second['id'], site_name='변조된 이름')
+        status, headers, _ = self.request('/daily-log', method='POST', form=form)
+        self.assertEqual(status, 303)
+        self.assertIn(second['id'], headers['location'])
+        self.assertEqual(len(repo.list_sources(workspace, site_id=second['id'])), 1)
+        self.assertEqual(repo.list_sources(workspace, site_id=first['id']), [])
+        other = repo.create_workspace('별도 작업공간')
+        foreign = repo.create_site(other['id'], '외부 현장')
+        self.assertEqual(self.request('/daily-log?site_id=' + foreign['id'])[0], 404)
+        form['site_id'] = foreign['id']
+        self.assertEqual(self.request('/daily-log', method='POST', form=form)[0], 404)
+
     def test_daily_log_tab_saves_structured_original_to_site_timeline(self) -> None:
         page_status, _, page_body = self.request("/daily-log")
         self.assertEqual(page_status, 200)

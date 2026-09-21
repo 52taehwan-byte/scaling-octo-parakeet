@@ -666,13 +666,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/daily-log", response_class=HTMLResponse)
     async def daily_log(request: Request) -> HTMLResponse:
-        return _render(request, "daily_log.html", daily_log_context(request))
+        values = {"log_date": datetime.now(SEOUL).date().isoformat()}
+        if request.query_params.get('site_id'):
+            site = _owned_site(repo, workspace_id, request.query_params['site_id'])
+            values.update(site_id=str(site['id']), site_name=str(site['name']))
+        return _render(request, "daily_log.html", daily_log_context(request, values=values))
 
     @app.post("/daily-log", response_class=HTMLResponse)
     async def daily_log_save(request: Request) -> HTMLResponse:
         values = await _form_dict(request)
         _validate_csrf(request, values)
         errors: dict[str, str] = {}
+        selected_site = None
+        if values.get('site_id'):
+            selected_site = _owned_site(repo, workspace_id, values['site_id'])
+            values['site_name'] = str(selected_site['name'])
         try:
             site_name = _text(values.get("site_name"), maximum=200, required=True)
         except ValueError:
@@ -714,6 +722,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         if not entry_text:
             errors["entry_text"] = "오늘 있었던 일을 편하게 적어 주세요."
+        if selected_site is None and site_name:
+            matches = [row for row in repo.list_sites(workspace_id) if str(row.get('name', '')).strip() == site_name]
+            if len(matches) > 1:
+                errors['site_name'] = '같은 이름의 현장이 여러 개입니다. 현장 목록에서 주소를 확인하고 해당 현장의 작업일지를 열어 주세요.'
+            elif matches:
+                selected_site = matches[0]
         if errors:
             return _render(request, "daily_log.html", daily_log_context(request, values=values, errors=errors), status_code=422)
 
@@ -721,8 +735,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         raw_text = "\n".join(raw_lines)
         original = _store_optional_original(current_settings, raw_text, kind="daily-demolition-log")
         try:
-            sites = repo.list_sites(workspace_id)
-            site = next((row for row in sites if str(row.get("name", "")).strip() == site_name), None)
+            site = selected_site
             if site is None:
                 site = repo.create_site(
                     workspace_id, site_name, business_status="in_progress",
