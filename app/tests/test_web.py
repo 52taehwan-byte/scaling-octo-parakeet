@@ -487,6 +487,32 @@ class WebSmokeTestCase(unittest.TestCase):
         self.assertEqual(review_status, 200)
         self.assertIn("이 값을 찾은 문장", review_body.decode("utf-8"))
 
+    def test_imported_work_leads_to_same_site_record_and_actual_expense(self) -> None:
+        chat = ('2099년 9월 2일 오전 9:00, 이준희 과장 청년철거 : <공사 일정 픽스입니다>\n'
+                '주소 : 가상시 연결로 7\n내용 : 가벽 철거\n공사 일정 : 9월 3일 오전 9시\n업체 실행비 : 100만원')
+        status, _ = asyncio.run(asgi_multipart_request(self.app, '/schedule-import',
+            fields={'csrf_token': self.csrf()}, files={'kakao_file': ('flow.txt', chat.encode('utf-8'))}))
+        self.assertEqual(status, 200)
+        repo, workspace = self.app.state.repo, self.app.state.workspace_id
+        item = next(r for r in repo.list_schedule_items(workspace) if r['address_text'] == '가상시 연결로 7')
+        site_id = item['site_id']
+        self.assertEqual(repo.list_for_site(site_id, 'money_item'), [])
+        status, _, body = self.request('/schedules/' + item['id'])
+        self.assertEqual(status, 200)
+        self.assertIn(('/daily-log?site_id=' + site_id).encode(), body)
+        self.assertIn(('/sites/' + site_id).encode(), body)
+        form = {'csrf_token': self.csrf(), 'site_id': site_id, 'log_date': '2099-09-03',
+                'entry_text': '가벽을 철거했다. 주유비 7만원 지불.'}
+        status, headers, _ = self.request('/daily-log', method='POST', form=form)
+        self.assertEqual(status, 303)
+        self.assertIn(site_id, headers['location'])
+        amounts = [r['amount_krw'] for r in repo.list_for_site(site_id, 'money_item')]
+        self.assertIn(70000, amounts)
+        self.assertNotIn(1000000, amounts)
+        self.assertEqual(len(repo.list_sources(workspace, site_id=site_id)), 1)
+        repo.set_schedule_cancelled(item['id'], cancelled=True, reason='시험 취소')
+        self.assertNotIn(('/daily-log?site_id=' + site_id).encode(), self.request('/schedules/' + item['id'])[2])
+
     def test_daily_log_keeps_selected_site_even_with_duplicate_names(self) -> None:
         repo, workspace = self.app.state.repo, self.app.state.workspace_id
         first = repo.create_site(workspace, '동명 시험 현장', address_text='가상로 1')

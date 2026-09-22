@@ -4,7 +4,13 @@
 {% block eyebrow %}<p class="eyebrow">{{ schedule.type_label }} 상세</p>{% endblock %}
 {% block page_heading %}{{ schedule.site_name or schedule.customer_name or schedule.title }}{% endblock %}
 {% block page_intro %}<p class="page-intro">오늘 화면에서는 접어 둔 일정 내용을 확인합니다.</p>{% endblock %}
-{% block page_actions %}<a class="button button--secondary" href="/">오늘로 돌아가기</a>{% endblock %}
+{% block page_actions %}
+  {% if schedule.site_id and schedule.type_class == 'work' and schedule.review_status == 'approved' and schedule.business_status != 'cancelled' %}
+  <a class="button button--primary" href="/daily-log?site_id={{ schedule.site_id }}">이 현장 작업 기록</a>
+  {% endif %}
+  {% if schedule.site_id %}<a class="button button--secondary" href="/sites/{{ schedule.site_id }}">현장 기록·지출 보기</a>{% endif %}
+  <a class="button button--secondary" href="/">오늘로 돌아가기</a>
+{% endblock %}
 {% block content %}
 <section class="panel schedule-detail">
   <div class="panel__header"><div><p class="eyebrow">일정 종류</p><h2><span class="schedule-type schedule-type--{{ schedule.type_class }}">{{ schedule.type_label }}</span></h2></div><span class="badge{% if schedule.business_status == 'cancelled' %} badge--muted{% else %} badge--confirmed{% endif %}">{{ schedule.status_label }}</span></div>
