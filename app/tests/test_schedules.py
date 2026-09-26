@@ -46,6 +46,20 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(rows[0]['total_quote_krw'], 4_800_000)
         self.assertEqual(rows[0]['revision'], 2)
 
+    def test_large_schedule_source_is_preserved_without_manual_splitting(self) -> None:
+        text = '한글 대화 기록\n' * 25000
+        folder = Path(self.temp.name) / 'large-originals'
+        first = import_schedule_candidates(self.repo, self.workspace['id'], folder, text, '')
+        second = import_schedule_candidates(self.repo, self.workspace['id'], folder, text, '')
+        self.assertEqual(first.source_id, second.source_id)
+        originals = list(folder.rglob('*.txt'))
+        self.assertEqual(len(originals), 1)
+        self.assertEqual(originals[0].read_text(encoding='utf-8'), text.strip() + '\n')
+        self.assertEqual(first.extracted, 0)
+        with self.assertRaises(ValueError):
+            import_schedule_candidates(self.repo, self.workspace['id'], folder, '가' * 666667, '')
+        self.assertEqual(len(self.repo.list_sources(self.workspace['id'])), 1)
+
     def test_markdown_only_keeps_document_provenance_and_deduplicates(self) -> None:
         text = '# 가상 현장\n주소 : 가상시 독립로 17\n내용 : 가벽 철거\n방문 일정 : 2099년 9월 25일 오전 11시'
         folder = Path(self.temp.name) / 'originals'
@@ -222,7 +236,8 @@ class ScheduleTests(unittest.TestCase):
 방문 일정 : 9월 24일 오후 2시
 """
         result = import_schedule_candidates(
-            self.repo, self.workspace["id"], Path(self.temp.name) / "untrusted-originals", text, ""
+            self.repo, self.workspace["id"], Path(self.temp.name) / "untrusted-originals", text, "",
+            not_before=date(2026, 9, 2),
         )
         self.assertEqual(result.approved, 0)
         self.assertEqual(len(self.repo.list_schedule_items(self.workspace["id"], review_status="pending")), 1)

@@ -186,6 +186,8 @@ class WebSmokeTestCase(unittest.TestCase):
         }
         for field, (name, text) in examples.items():
             with self.subTest(field=field):
+                if field == 'kakao_file':
+                    text = ('이전 대화\n' * 35000) + text
                 status, body = asyncio.run(asgi_multipart_request(self.app, '/schedule-import',
                     fields={'csrf_token': self.csrf()}, files={field: (name, text.encode('utf-8'))}))
                 self.assertEqual(status, 200)

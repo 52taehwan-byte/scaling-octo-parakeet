@@ -32,12 +32,13 @@ def store_text_original(
     *,
     kind: str = "note",
     now: datetime | None = None,
+    max_characters: int = 200_000,
 ) -> StoredOriginal:
     clean_text = text.strip()
     if not clean_text:
         raise ValueError("보존할 원문이 비어 있습니다.")
-    if len(clean_text) > 200_000:
-        raise ValueError("한 번에 저장할 원문은 20만 자를 넘을 수 없습니다.")
+    if len(clean_text) > max_characters:
+        raise ValueError(f"한 번에 저장할 원문은 {max_characters:,}자를 넘을 수 없습니다.")
 
     root = Path(originals_dir).expanduser().resolve()
     moment = now or datetime.now().astimezone()

@@ -314,11 +314,13 @@ def _source_for_text(
     original_name: str,
     source_type: str,
 ) -> dict[str, Any]:
+    if len(text.encode('utf-8')) > 2_000_000:
+        raise ValueError('각 일정 자료는 UTF-8 기준 2MB 이하여야 합니다.')
     digest = hashlib.sha256((text.strip() + "\n").encode("utf-8")).hexdigest()
     existing = next((row for row in repo.list_sources(workspace_id) if row["content_hash_sha256"] == digest), None)
     if existing:
         return existing
-    stored = store_text_original(originals_dir, text, kind="schedule-source")
+    stored = store_text_original(originals_dir, text, kind="schedule-source", max_characters=2_000_000)
     try:
         return repo.create_source(
             workspace_id, source_type, stored.sha256, f"local-original:{stored.relative_path}",
